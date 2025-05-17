@@ -1,0 +1,4 @@
+*
+!.gitignore
+!fke/
+employees_photo/*
