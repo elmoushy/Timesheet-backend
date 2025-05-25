@@ -4,7 +4,7 @@
 
 namespace Composer\Autoload;
 
-class ComposerStaticInit9c491b8531eec05ba41a11d9276a5749
+class ComposerStaticInit1a8f493bded02a1291357a29902235e4
 {
     public static $files = array (
         '6e3fae29631ef280660b3cdad06f25a8' => __DIR__ . '/..' . '/symfony/deprecation-contracts/function.php',
@@ -540,17 +540,20 @@ class ComposerStaticInit9c491b8531eec05ba41a11d9276a5749
     );
 
     public static $classMap = array (
-        'App\\Actions\\ElaborateSummary' => __DIR__ . '/..' . '/laravel/pint/app/Actions/ElaborateSummary.php',
-        'App\\Actions\\FixCode' => __DIR__ . '/..' . '/laravel/pint/app/Actions/FixCode.php',
-        'App\\Commands\\DefaultCommand' => __DIR__ . '/..' . '/laravel/pint/app/Commands/DefaultCommand.php',
         'App\\Console\\Kernel' => __DIR__ . '/../..' . '/app/Console/Kernel.php',
-        'App\\Contracts\\PathsRepository' => __DIR__ . '/..' . '/laravel/pint/app/Contracts/PathsRepository.php',
-        'App\\Exceptions\\HandleExceptions' => __DIR__ . '/..' . '/laravel/pint/app/Exceptions/HandleExceptions.php',
         'App\\Exceptions\\Handler' => __DIR__ . '/../..' . '/app/Exceptions/Handler.php',
-        'App\\Factories\\ConfigurationFactory' => __DIR__ . '/..' . '/laravel/pint/app/Factories/ConfigurationFactory.php',
-        'App\\Factories\\ConfigurationResolverFactory' => __DIR__ . '/..' . '/laravel/pint/app/Factories/ConfigurationResolverFactory.php',
+        'App\\Http\\Controllers\\API\\ApplicationController' => __DIR__ . '/../..' . '/app/Http/Controllers/API/ApplicationController.php',
+        'App\\Http\\Controllers\\API\\AuthController' => __DIR__ . '/../..' . '/app/Http/Controllers/API/AuthController.php',
+        'App\\Http\\Controllers\\API\\ClientController' => __DIR__ . '/../..' . '/app/Http/Controllers/API/ClientController.php',
+        'App\\Http\\Controllers\\API\\DepartmentController' => __DIR__ . '/../..' . '/app/Http/Controllers/API/DepartmentController.php',
+        'App\\Http\\Controllers\\API\\EmployeeController' => __DIR__ . '/../..' . '/app/Http/Controllers/API/EmployeeController.php',
+        'App\\Http\\Controllers\\API\\ProjectAssignEmployeeController' => __DIR__ . '/../..' . '/app/Http/Controllers/API/ProjectAssignEmployeeController.php',
+        'App\\Http\\Controllers\\API\\ProjectController' => __DIR__ . '/../..' . '/app/Http/Controllers/API/ProjectController.php',
+        'App\\Http\\Controllers\\API\\TaskController' => __DIR__ . '/../..' . '/app/Http/Controllers/API/TaskController.php',
+        'App\\Http\\Controllers\\API\\TimesheetController' => __DIR__ . '/../..' . '/app/Http/Controllers/API/TimesheetController.php',
         'App\\Http\\Controllers\\Controller' => __DIR__ . '/../..' . '/app/Http/Controllers/Controller.php',
         'App\\Http\\Kernel' => __DIR__ . '/../..' . '/app/Http/Kernel.php',
+        'App\\Http\\Middleware\\AdminMiddleware' => __DIR__ . '/../..' . '/app/Http/Middleware/AdminMiddleware.php',
         'App\\Http\\Middleware\\Authenticate' => __DIR__ . '/../..' . '/app/Http/Middleware/Authenticate.php',
         'App\\Http\\Middleware\\Cors' => __DIR__ . '/../..' . '/app/Http/Middleware/Cors.php',
         'App\\Http\\Middleware\\EncryptCookies' => __DIR__ . '/../..' . '/app/Http/Middleware/EncryptCookies.php',
@@ -561,23 +564,34 @@ class ComposerStaticInit9c491b8531eec05ba41a11d9276a5749
         'App\\Http\\Middleware\\TrustProxies' => __DIR__ . '/../..' . '/app/Http/Middleware/TrustProxies.php',
         'App\\Http\\Middleware\\ValidateSignature' => __DIR__ . '/../..' . '/app/Http/Middleware/ValidateSignature.php',
         'App\\Http\\Middleware\\VerifyCsrfToken' => __DIR__ . '/../..' . '/app/Http/Middleware/VerifyCsrfToken.php',
-        'App\\Kernel' => __DIR__ . '/..' . '/laravel/pint/app/Kernel.php',
-        'App\\Output\\Concerns\\InteractsWithSymbols' => __DIR__ . '/..' . '/laravel/pint/app/Output/Concerns/InteractsWithSymbols.php',
-        'App\\Output\\ProgressOutput' => __DIR__ . '/..' . '/laravel/pint/app/Output/ProgressOutput.php',
-        'App\\Output\\SummaryOutput' => __DIR__ . '/..' . '/laravel/pint/app/Output/SummaryOutput.php',
-        'App\\Project' => __DIR__ . '/..' . '/laravel/pint/app/Project.php',
-        'App\\Providers\\ActionsServiceProvider' => __DIR__ . '/..' . '/laravel/pint/app/Providers/ActionsServiceProvider.php',
+        'App\\Models\\Application' => __DIR__ . '/../..' . '/app/Models/Application.php',
+        'App\\Models\\Client' => __DIR__ . '/../..' . '/app/Models/Client.php',
+        'App\\Models\\ClientNumber' => __DIR__ . '/../..' . '/app/Models/ClientNumber.php',
+        'App\\Models\\Department' => __DIR__ . '/../..' . '/app/Models/Department.php',
+        'App\\Models\\DepartmentManager' => __DIR__ . '/../..' . '/app/Models/DepartmentManager.php',
+        'App\\Models\\EmpApplication' => __DIR__ . '/../..' . '/app/Models/EmpApplication.php',
+        'App\\Models\\EmpEmergContact' => __DIR__ . '/../..' . '/app/Models/EmpEmergContact.php',
+        'App\\Models\\EmpPhone' => __DIR__ . '/../..' . '/app/Models/EmpPhone.php',
+        'App\\Models\\Employee' => __DIR__ . '/../..' . '/app/Models/Employee.php',
+        'App\\Models\\Permission' => __DIR__ . '/../..' . '/app/Models/Permission.php',
+        'App\\Models\\Product' => __DIR__ . '/../..' . '/app/Models/Product.php',
+        'App\\Models\\ProjProduct' => __DIR__ . '/../..' . '/app/Models/ProjProduct.php',
+        'App\\Models\\Project' => __DIR__ . '/../..' . '/app/Models/Project.php',
+        'App\\Models\\ProjectEmployeeAssignment' => __DIR__ . '/../..' . '/app/Models/ProjectEmployeeAssignment.php',
+        'App\\Models\\ProjectManager' => __DIR__ . '/../..' . '/app/Models/ProjectManager.php',
+        'App\\Models\\Role' => __DIR__ . '/../..' . '/app/Models/Role.php',
+        'App\\Models\\Task' => __DIR__ . '/../..' . '/app/Models/Task.php',
+        'App\\Models\\Timesheet' => __DIR__ . '/../..' . '/app/Models/Timesheet.php',
+        'App\\Models\\TimesheetApproval' => __DIR__ . '/../..' . '/app/Models/TimesheetApproval.php',
+        'App\\Models\\TimesheetChat' => __DIR__ . '/../..' . '/app/Models/TimesheetChat.php',
+        'App\\Models\\TimesheetRow' => __DIR__ . '/../..' . '/app/Models/TimesheetRow.php',
+        'App\\Models\\TimesheetWorkflowHistory' => __DIR__ . '/../..' . '/app/Models/TimesheetWorkflowHistory.php',
         'App\\Providers\\AppServiceProvider' => __DIR__ . '/../..' . '/app/Providers/AppServiceProvider.php',
         'App\\Providers\\AuthServiceProvider' => __DIR__ . '/../..' . '/app/Providers/AuthServiceProvider.php',
         'App\\Providers\\BroadcastServiceProvider' => __DIR__ . '/../..' . '/app/Providers/BroadcastServiceProvider.php',
-        'App\\Providers\\CommandsServiceProvider' => __DIR__ . '/..' . '/laravel/pint/app/Providers/CommandsServiceProvider.php',
         'App\\Providers\\EventServiceProvider' => __DIR__ . '/../..' . '/app/Providers/EventServiceProvider.php',
         'App\\Providers\\OracleDatabaseServiceProvider' => __DIR__ . '/../..' . '/app/Providers/OracleDatabaseServiceProvider.php',
-        'App\\Providers\\RepositoriesServiceProvider' => __DIR__ . '/..' . '/laravel/pint/app/Providers/RepositoriesServiceProvider.php',
         'App\\Providers\\RouteServiceProvider' => __DIR__ . '/../..' . '/app/Providers/RouteServiceProvider.php',
-        'App\\Repositories\\ConfigurationJsonRepository' => __DIR__ . '/..' . '/laravel/pint/app/Repositories/ConfigurationJsonRepository.php',
-        'App\\Repositories\\GitPathsRepository' => __DIR__ . '/..' . '/laravel/pint/app/Repositories/GitPathsRepository.php',
-        'App\\ValueObjects\\Issue' => __DIR__ . '/..' . '/laravel/pint/app/ValueObjects/Issue.php',
         'Attribute' => __DIR__ . '/..' . '/symfony/polyfill-php80/Resources/stubs/Attribute.php',
         'Brick\\Math\\BigDecimal' => __DIR__ . '/..' . '/brick/math/src/BigDecimal.php',
         'Brick\\Math\\BigInteger' => __DIR__ . '/..' . '/brick/math/src/BigInteger.php',
@@ -6365,7 +6379,6 @@ class ComposerStaticInit9c491b8531eec05ba41a11d9276a5749
         'Symfony\\Component\\String\\Inflector\\InflectorInterface' => __DIR__ . '/..' . '/symfony/string/Inflector/InflectorInterface.php',
         'Symfony\\Component\\String\\Inflector\\SpanishInflector' => __DIR__ . '/..' . '/symfony/string/Inflector/SpanishInflector.php',
         'Symfony\\Component\\String\\LazyString' => __DIR__ . '/..' . '/symfony/string/LazyString.php',
-        'Symfony\\Component\\String\\Resources\\WcswidthDataGenerator' => __DIR__ . '/..' . '/symfony/string/Resources/WcswidthDataGenerator.php',
         'Symfony\\Component\\String\\Slugger\\AsciiSlugger' => __DIR__ . '/..' . '/symfony/string/Slugger/AsciiSlugger.php',
         'Symfony\\Component\\String\\Slugger\\SluggerInterface' => __DIR__ . '/..' . '/symfony/string/Slugger/SluggerInterface.php',
         'Symfony\\Component\\String\\TruncateMode' => __DIR__ . '/..' . '/symfony/string/TruncateMode.php',
@@ -6704,9 +6717,9 @@ class ComposerStaticInit9c491b8531eec05ba41a11d9276a5749
     public static function getInitializer(ClassLoader $loader)
     {
         return \Closure::bind(function () use ($loader) {
-            $loader->prefixLengthsPsr4 = ComposerStaticInit9c491b8531eec05ba41a11d9276a5749::$prefixLengthsPsr4;
-            $loader->prefixDirsPsr4 = ComposerStaticInit9c491b8531eec05ba41a11d9276a5749::$prefixDirsPsr4;
-            $loader->classMap = ComposerStaticInit9c491b8531eec05ba41a11d9276a5749::$classMap;
+            $loader->prefixLengthsPsr4 = ComposerStaticInit1a8f493bded02a1291357a29902235e4::$prefixLengthsPsr4;
+            $loader->prefixDirsPsr4 = ComposerStaticInit1a8f493bded02a1291357a29902235e4::$prefixDirsPsr4;
+            $loader->classMap = ComposerStaticInit1a8f493bded02a1291357a29902235e4::$classMap;
 
         }, null, ClassLoader::class);
     }

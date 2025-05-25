@@ -158,10 +158,6 @@ class DatabaseManager implements ConnectionResolverInterface
     {
         $config = $this->configuration($name);
 
-        if (! isset($config['driver'])) {
-            $config['driver'] = 'oracle';
-        }
-
         // First we will check by the connection name to see if an extension has been
         // registered specifically for that connection. If it has we will call the
         // Closure and pass it the config allowing it to resolve the connection.
