@@ -201,6 +201,164 @@ class Employee extends Authenticatable
         return $this->belongsToMany(Role::class, 'xxx_employee_role', 'employee_id', 'role_id');
     }
 
+    /* ─────────────────────  Task Management Relationships  ───────────────────── */
+
+    /**
+     * Get personal tasks created by this employee
+     */
+    public function personalTasks()
+    {
+        return $this->hasMany(PersonalTask::class, 'employee_id');
+    }
+
+    /**
+     * Get project tasks assigned to this employee
+     */
+    public function projectTasks()
+    {
+        return $this->hasMany(ProjectTask::class, 'employee_id');
+    }
+
+    /**
+     * Get tasks assigned to this employee by managers
+     */
+    public function assignedTasks()
+    {
+        return $this->hasMany(AssignedTask::class, 'assigned_to');
+    }
+
+    /**
+     * Get tasks assigned by this employee (if they are a manager)
+     */
+    public function tasksAssignedByMe()
+    {
+        return $this->hasMany(AssignedTask::class, 'assigned_by');
+    }
+
+    /**
+     * Get productivity analytics for this employee
+     */
+    public function productivityAnalytics()
+    {
+        return $this->hasMany(EmployeeProductivityAnalytics::class, 'employee_id');
+    }
+
+    /**
+     * Get workload capacity data for this employee
+     */
+    public function workloadCapacity()
+    {
+        return $this->hasMany(EmployeeWorkloadCapacity::class, 'employee_id');
+    }
+
+    /**
+     * Get current week workload capacity
+     */
+    public function currentWeekWorkload()
+    {
+        return $this->hasOne(EmployeeWorkloadCapacity::class, 'employee_id')
+            ->where('week_start_date', now()->startOfWeek());
+    }
+
+    /**
+     * Get task activity logs for this employee
+     */
+    public function taskActivityLogs()
+    {
+        return $this->hasMany(TaskActivityLog::class, 'employee_id');
+    }
+
+    /**
+     * Get bulk operations initiated by this employee
+     */
+    public function bulkTaskOperations()
+    {
+        return $this->hasMany(BulkTaskOperation::class, 'initiated_by');
+    }
+
+    /**
+     * Get all important tasks across all task types
+     */
+    public function importantTasks()
+    {
+        $personalTasks = $this->personalTasks()->important()->get()->map(function ($task) {
+            $task->task_type = 'personal';
+            return $task;
+        });
+
+        $projectTasks = $this->projectTasks()->important()->get()->map(function ($task) {
+            $task->task_type = 'project';
+            return $task;
+        });
+
+        $assignedTasks = $this->assignedTasks()->important()->get()->map(function ($task) {
+            $task->task_type = 'assigned';
+            return $task;
+        });
+
+        return $personalTasks->concat($projectTasks)->concat($assignedTasks);
+    }
+
+    /**
+     * Get current productivity streak
+     */
+    public function getCurrentStreak(): int
+    {
+        $latestAnalytics = $this->productivityAnalytics()
+            ->orderBy('date', 'desc')
+            ->first();
+
+        return $latestAnalytics ? $latestAnalytics->streak_days : 0;
+    }
+
+    /**
+     * Get total tasks count by status
+     */
+    public function getTaskCountsByStatus(): array
+    {
+        $personal = $this->personalTasks()->selectRaw('status, count(*) as count')->groupBy('status')->pluck('count', 'status')->toArray();
+        $project = $this->projectTasks()->selectRaw('status, count(*) as count')->groupBy('status')->pluck('count', 'status')->toArray();
+        $assigned = $this->assignedTasks()->selectRaw('status, count(*) as count')->groupBy('status')->pluck('count', 'status')->toArray();
+
+        $statuses = ['to-do', 'doing', 'done', 'blocked'];
+        $result = [];
+
+        foreach ($statuses as $status) {
+            $result[$status] = [
+                'personal' => $personal[$status] ?? 0,
+                'project' => $project[$status] ?? 0,
+                'assigned' => $assigned[$status] ?? 0,
+                'total' => ($personal[$status] ?? 0) + ($project[$status] ?? 0) + ($assigned[$status] ?? 0)
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Check if employee is a department manager
+     */
+    public function isDepartmentManager(): bool
+    {
+        return $this->managedDepartments()->count() > 0;
+    }
+
+    /**
+     * Get employees in departments managed by this employee
+     */
+    public function getManagedEmployees()
+    {
+        if (!$this->isDepartmentManager()) {
+            return collect();
+        }
+
+        $departmentIds = $this->managedDepartments()->pluck('department_id');
+
+        return Employee::whereIn('department_id', $departmentIds)
+            ->where('id', '!=', $this->id) // Exclude self
+            ->get();
+    }
+
     /**
      * Get username field for authentication.
      * This tells Laravel which field to use for authentication.

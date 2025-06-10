@@ -5,6 +5,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Client;
+use App\Models\AssignedTask;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -289,5 +290,29 @@ class DepartmentController extends Controller
         });
 
         return $this->ok('Client search results', $formattedResults);
+    }
+
+    /* ────  ───────────── ──  Employee Assigned Tasks  ───────────────────── */
+    public function getEmployeeAssignedTasks(int $employeeId): JsonResponse
+    {
+        $employee = Employee::find($employeeId);
+        if (!$employee) {
+            return $this->fail('Employee not found', 404);
+        }
+
+        try {
+            $assignedTasks = AssignedTask::where('assigned_to', $employeeId)
+                ->with(['task', 'assignedBy'])
+                ->orderBy('is_pinned', 'desc')
+                ->orderBy('due_date', 'asc')
+                ->get();
+
+            return $this->ok(
+                'Employee assigned tasks fetched successfully',
+                $assignedTasks
+            );
+        } catch (Throwable $e) {
+            return $this->fail('Error fetching assigned tasks: ' . $e->getMessage(), 500);
+        }
     }
 }

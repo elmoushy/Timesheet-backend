@@ -113,4 +113,27 @@ class ProjectEmployeeAssignment extends Model
 
         return $this->save();
     }
+
+    /**
+     * Get project tasks generated from this assignment
+     */
+    public function projectTasks()
+    {
+        return $this->hasMany(ProjectTask::class, 'project_assignment_id');
+    }
+
+    /**
+     * Generate default project task when assignment is approved
+     */
+    public function generateDefaultProjectTask(): ProjectTask
+    {
+        return ProjectTask::create([
+            'employee_id' => $this->employee_id,
+            'project_assignment_id' => $this->id,
+            'title' => 'Work on ' . $this->project->project_name,
+            'description' => 'Auto-generated task for project assignment',
+            'status' => 'to-do',
+            'auto_generated' => true,
+        ]);
+    }
 }

@@ -1,0 +1,795 @@
+{
+  "description": "Time Management API endpoints for employee task management, personal task tracking, project task management, and assigned task management. Implements 13 comprehensive endpoints covering all aspects of employee task management with analytics and productivity tracking.",
+  "base_url": "http://127.0.0.1:8000",
+  "authentication": "Required for all endpoints - Bearer token authentication",
+  "authorization": "Employee access - users can only access their own data",
+  "note": "All 13 endpoints are fully implemented with comprehensive functionality including analytics, time logging, feedback submission, and task status management.",
+  "items": [
+    {
+      "name": "Get Employee Dashboard",
+      "description": "Retrieves comprehensive employee dashboard with personal tasks, project tasks, assigned tasks, important tasks, productivity analytics, and task summaries",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/api/time-management/dashboard",
+          "host": ["{{base_url}}"],
+          "path": ["api", "time-management", "dashboard"]
+        },
+        "headers": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Accept", "value": "application/json" }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "message": "Employee dashboard retrieved successfully",
+          "data": {
+            "personal_tasks": [
+              {
+                "id": 1,
+                "employee_id": 1,
+                "title": "Complete quarterly report",
+                "description": "Finalize Q2 performance analysis",
+                "status": "doing",
+                "progress_points": 75,
+                "due_date": "2025-05-30",
+                "estimated_hours": 8,
+                "actual_hours": 6,
+                "is_important": true,
+                "is_pinned": true,
+                "notes": "Focus on revenue metrics",
+                "created_at": "2025-05-20T09:00:00.000000Z",
+                "updated_at": "2025-05-25T14:30:00.000000Z"
+              }
+            ],
+            "project_tasks": [
+              {
+                "id": 1,
+                "employee_id": 1,
+                "project_assignment_id": 1,
+                "title": "Frontend development",
+                "description": "Implement user authentication module",
+                "status": "to-do",
+                "progress_points": 0,
+                "due_date": "2025-06-05",
+                "estimated_hours": 16,
+                "actual_hours": 0,
+                "is_important": false,
+                "is_pinned": false,
+                "project_assignment": {
+                  "project": {
+                    "id": 1,
+                    "name": "E-commerce Platform",
+                    "description": "Customer portal development"
+                  }
+                }
+              }
+            ],
+            "assigned_tasks": [
+              {
+                "id": 1,
+                "task_id": 1,
+                "assigned_to": 1,
+                "assigned_by": 2,
+                "status": "doing",
+                "progress_points": 50,
+                "due_date": "2025-05-28",
+                "estimated_hours": 4,
+                "actual_hours": 2,
+                "permission_level": "full_edit",
+                "is_important": true,
+                "is_pinned": true,
+                "task": {
+                  "id": 1,
+                  "title": "Database migration",
+                  "description": "Migrate legacy data to new schema"
+                },
+                "assigned_by_user": {
+                  "id": 2,
+                  "first_name": "Jane",
+                  "last_name": "Manager"
+                }
+              }
+            ],
+            "important_tasks": {
+              "personal": [
+                {
+                  "id": 1,
+                  "title": "Complete quarterly report",
+                  "status": "doing",
+                  "due_date": "2025-05-30"
+                }
+              ],
+              "project": [],
+              "assigned": [
+                {
+                  "id": 1,
+                  "title": "Database migration",
+                  "status": "doing",
+                  "due_date": "2025-05-28"
+                }
+              ]
+            },
+            "analytics": {
+              "current_streak": 5,
+              "max_streak": 12,
+              "weekly_data": [
+                {
+                  "id": 1,
+                  "employee_id": 1,
+                  "date": "2025-05-19",
+                  "tasks_completed": 3,
+                  "tasks_created": 2,
+                  "total_progress_points": 85,
+                  "hours_logged": 8,
+                  "streak_days": 1,
+                  "max_streak": 12
+                },
+                {
+                  "id": 2,
+                  "employee_id": 1,
+                  "date": "2025-05-20",
+                  "tasks_completed": 2,
+                  "tasks_created": 1,
+                  "total_progress_points": 60,
+                  "hours_logged": 7,
+                  "streak_days": 2,
+                  "max_streak": 12
+                }
+              ]
+            },
+            "summary": {
+              "total_tasks": 15,
+              "completed_today": 3,
+              "overdue_tasks": 2,
+              "due_this_week": 8
+            }
+          }
+        }
+      },
+      "errorResponses": [
+        {
+          "status": 401,
+          "body": {
+            "message": "Unauthorized access",
+            "data": []
+          }
+        },
+        {
+          "status": 500,
+          "body": {
+            "message": "Error retrieving dashboard: [error details]",
+            "data": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Personal Tasks",
+      "description": "Retrieves all personal tasks for the authenticated employee with optional filtering by status, importance, or pinned status",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/api/time-management/personal-tasks?status=doing&important=true&pinned=false",
+          "host": ["{{base_url}}"],
+          "path": ["api", "time-management", "personal-tasks"],
+          "query": [
+            { "key": "status", "value": "doing", "description": "Filter by task status (to-do, doing, done, blocked)" },
+            { "key": "important", "value": "true", "description": "Filter by importance (true/false)" },
+            { "key": "pinned", "value": "false", "description": "Filter by pinned status (true/false)" }
+          ]
+        },
+        "headers": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Accept", "value": "application/json" }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "message": "Personal tasks retrieved successfully",
+          "data": [
+            {
+              "id": 1,
+              "employee_id": 1,
+              "title": "Complete quarterly report",
+              "description": "Finalize Q2 performance analysis",
+              "status": "doing",
+              "progress_points": 75,
+              "due_date": "2025-05-30",
+              "estimated_hours": 8,
+              "actual_hours": 6,
+              "is_important": true,
+              "is_pinned": true,
+              "notes": "Focus on revenue metrics",
+              "created_at": "2025-05-20T09:00:00.000000Z",
+              "updated_at": "2025-05-25T14:30:00.000000Z"
+            }
+          ]
+        }
+      },
+      "errorResponses": [
+        {
+          "status": 500,
+          "body": {
+            "message": "Error retrieving personal tasks: [error details]",
+            "data": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create Personal Task",
+      "description": "Creates a new personal task for the authenticated employee with title, description, due date, and estimated hours",
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "{{base_url}}/api/time-management/personal-tasks",
+          "host": ["{{base_url}}"],
+          "path": ["api", "time-management", "personal-tasks"]
+        },
+        "headers": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": {
+            "title": "Complete project documentation",
+            "description": "Write comprehensive API documentation for frontend team",
+            "due_date": "2025-06-01",
+            "estimated_hours": 12,
+            "notes": "Include authentication flow diagrams"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "message": "Personal task created successfully",
+          "data": {
+            "id": 2,
+            "employee_id": 1,
+            "title": "Complete project documentation",
+            "description": "Write comprehensive API documentation for frontend team",
+            "status": "to-do",
+            "progress_points": 0,
+            "due_date": "2025-06-01",
+            "estimated_hours": 12,
+            "actual_hours": 0,
+            "is_important": false,
+            "is_pinned": false,
+            "notes": "Include authentication flow diagrams",
+            "created_at": "2025-05-25T10:00:00.000000Z",
+            "updated_at": "2025-05-25T10:00:00.000000Z"
+          }
+        }
+      },
+      "errorResponses": [
+        {
+          "status": 422,
+          "body": {
+            "message": "The title field is required.",
+            "data": []
+          }
+        },
+        {
+          "status": 500,
+          "body": {
+            "message": "Error creating personal task: [error details]",
+            "data": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "Update Personal Task",
+      "description": "Updates an existing personal task for the authenticated employee. Can update title, description, status, progress, due date, hours, importance, and pinned status",
+      "request": {
+        "method": "PUT",
+        "url": {
+          "raw": "{{base_url}}/api/time-management/personal-tasks/1",
+          "host": ["{{base_url}}"],
+          "path": ["api", "time-management", "personal-tasks", "1"]
+        },
+        "headers": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": {
+            "title": "Complete quarterly report - Updated",
+            "description": "Finalize Q2 performance analysis with revenue metrics",
+            "status": "done",
+            "progress_points": 100,
+            "due_date": "2025-05-30",
+            "estimated_hours": 8,
+            "actual_hours": 8,
+            "is_important": true,
+            "is_pinned": false,
+            "notes": "Completed with full revenue analysis"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "message": "Personal task updated successfully",
+          "data": {
+            "id": 1,
+            "employee_id": 1,
+            "title": "Complete quarterly report - Updated",
+            "description": "Finalize Q2 performance analysis with revenue metrics",
+            "status": "done",
+            "progress_points": 100,
+            "due_date": "2025-05-30",
+            "estimated_hours": 8,
+            "actual_hours": 8,
+            "is_important": true,
+            "is_pinned": false,
+            "notes": "Completed with full revenue analysis",
+            "created_at": "2025-05-20T09:00:00.000000Z",
+            "updated_at": "2025-05-25T15:00:00.000000Z"
+          }
+        }
+      },
+      "errorResponses": [
+        {
+          "status": 404,
+          "body": {
+            "message": "Personal task not found or unauthorized",
+            "data": []
+          }
+        },
+        {
+          "status": 422,
+          "body": {
+            "message": "Invalid status. Must be one of: to-do, doing, done, blocked",
+            "data": []
+          }
+        },
+        {
+          "status": 500,
+          "body": {
+            "message": "Error updating personal task: [error details]",
+            "data": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Analytics",
+      "description": "Retrieves productivity analytics for the authenticated employee including task completion trends, streaks, and performance metrics",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/api/time-management/analytics",
+          "host": ["{{base_url}}"],
+          "path": ["api", "time-management", "analytics"]
+        },
+        "headers": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Accept", "value": "application/json" }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "message": "Analytics retrieved successfully",
+          "data": {
+            "current_streak": 5,
+            "max_streak": 12,
+            "total_tasks_completed": 87,
+            "total_hours_logged": 145.5,
+            "average_daily_tasks": 3.2,
+            "productivity_trend": "increasing",
+            "daily_data": [
+              {
+                "date": "2025-05-25",
+                "tasks_completed": 4,
+                "tasks_created": 2,
+                "total_progress_points": 85,
+                "hours_logged": 7.5,
+                "streak_days": 5
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "Get Important Tasks",
+      "description": "Retrieves all important tasks from personal, project, and assigned categories for the authenticated employee",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/api/time-management/important-tasks",
+          "host": ["{{base_url}}"],
+          "path": ["api", "time-management", "important-tasks"]
+        },
+        "headers": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Accept", "value": "application/json" }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "message": "Important tasks retrieved successfully",
+          "data": {
+            "personal": [
+              {
+                "id": 1,
+                "title": "Complete quarterly report",
+                "status": "doing",
+                "due_date": "2025-05-30",
+                "is_important": true
+              }
+            ],
+            "project": [
+              {
+                "id": 1,
+                "title": "Frontend development",
+                "status": "doing",
+                "due_date": "2025-06-01",
+                "project_assignment": {
+                  "project": {
+                    "id": 1,
+                    "project_name": "E-commerce Platform"
+                  }
+                }
+              }
+            ],
+            "assigned": [
+              {
+                "id": 1,
+                "title": "Code review",
+                "status": "to-do",
+                "due_date": "2025-05-28",
+                "assigned_by": {
+                  "id": 2,
+                  "name": "John Manager"
+                }
+              }
+            ],
+            "total_count": 3
+          }
+        }
+      }
+    },
+    {
+      "name": "Delete Personal Task",
+      "description": "Deletes a personal task belonging to the authenticated employee",
+      "request": {
+        "method": "DELETE",
+        "url": {
+          "raw": "{{base_url}}/api/time-management/personal-tasks/1",
+          "host": ["{{base_url}}"],
+          "path": ["api", "time-management", "personal-tasks", "1"]
+        },
+        "headers": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Accept", "value": "application/json" }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "message": "Personal task deleted successfully",
+          "data": []
+        }
+      }
+    },
+    {
+      "name": "Update Personal Task Status",
+      "description": "Updates only the status and progress points of a personal task",
+      "request": {
+        "method": "PUT",
+        "url": {
+          "raw": "{{base_url}}/api/time-management/personal-tasks/1/status",
+          "host": ["{{base_url}}"],
+          "path": ["api", "time-management", "personal-tasks", "1", "status"]
+        },
+        "headers": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "raw": "{\n  \"status\": \"done\",\n  \"progress_points\": 100\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "message": "Personal task status updated successfully",
+          "data": {
+            "id": 1,
+            "status": "done",
+            "progress_points": 100,
+            "updated_at": "2025-05-25T15:30:00.000000Z"
+          }
+        }
+      }
+    },
+    {
+      "name": "Get Project Tasks",
+      "description": "Retrieves all project tasks assigned to the authenticated employee with optional filtering",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/api/time-management/project-tasks?status=doing&project_id=1",
+          "host": ["{{base_url}}"],
+          "path": ["api", "time-management", "project-tasks"],
+          "query": [
+            { "key": "status", "value": "doing" },
+            { "key": "project_id", "value": "1" }
+          ]
+        },
+        "headers": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Accept", "value": "application/json" }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "message": "Project tasks retrieved successfully",
+          "data": [
+            {
+              "id": 1,
+              "employee_id": 1,
+              "project_assignment_id": 1,
+              "title": "Frontend development",
+              "description": "Implement user dashboard",
+              "status": "doing",
+              "progress_points": 60,
+              "due_date": "2025-06-01",
+              "estimated_hours": 40,
+              "actual_hours": 24,
+              "is_important": true,
+              "is_pinned": false,
+              "project_assignment": {
+                "project": {
+                  "id": 1,
+                  "project_name": "E-commerce Platform"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Update Project Task Status",
+      "description": "Updates the status and optionally progress points of a project task",
+      "request": {
+        "method": "PUT",
+        "url": {
+          "raw": "{{base_url}}/api/time-management/project-tasks/1/status",
+          "host": ["{{base_url}}"],
+          "path": ["api", "time-management", "project-tasks", "1", "status"]
+        },
+        "headers": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "raw": "{\n  \"status\": \"done\",\n  \"progress_points\": 100\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "message": "Project task status updated successfully",
+          "data": {
+            "id": 1,
+            "status": "done",
+            "progress_points": 100,
+            "updated_at": "2025-05-25T15:45:00.000000Z"
+          }
+        }
+      }
+    },
+    {
+      "name": "Log Time Spent on Project Task",
+      "description": "Logs time spent working on a specific project task",
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "{{base_url}}/api/time-management/project-tasks/1/time-spent",
+          "host": ["{{base_url}}"],
+          "path": ["api", "time-management", "project-tasks", "1", "time-spent"]
+        },
+        "headers": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "raw": "{\n  \"hours\": 3.5,\n  \"date\": \"2025-05-25\",\n  \"description\": \"Implemented user authentication module\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "message": "Time logged successfully",
+          "data": {
+            "task_id": 1,
+            "hours_logged": 3.5,
+            "total_actual_hours": 27.5,
+            "date": "2025-05-25"
+          }
+        }
+      }
+    },
+    {
+      "name": "Get Assigned Tasks",
+      "description": "Retrieves all tasks assigned to the authenticated employee by managers with optional filtering",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/api/time-management/assigned-tasks?status=to-do&assigned_by=2",
+          "host": ["{{base_url}}"],
+          "path": ["api", "time-management", "assigned-tasks"],
+          "query": [
+            { "key": "status", "value": "to-do" },
+            { "key": "assigned_by", "value": "2" }
+          ]
+        },
+        "headers": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Accept", "value": "application/json" }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "message": "Assigned tasks retrieved successfully",
+          "data": [
+            {
+              "id": 1,
+              "task_id": 1,
+              "assigned_to": 1,
+              "assigned_by": 2,
+              "status": "to-do",
+              "permission_level": "edit",
+              "due_date": "2025-05-28",
+              "is_important": true,
+              "is_pinned": false,
+              "task": {
+                "id": 1,
+                "title": "Code review",
+                "description": "Review pull requests for authentication module"
+              },
+              "assigned_by": {
+                "id": 2,
+                "name": "John Manager"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Update Assigned Task Status",
+      "description": "Updates the status of an assigned task with permission checking",
+      "request": {
+        "method": "PUT",
+        "url": {
+          "raw": "{{base_url}}/api/time-management/assigned-tasks/1/status",
+          "host": ["{{base_url}}"],
+          "path": ["api", "time-management", "assigned-tasks", "1", "status"]
+        },
+        "headers": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "raw": "{\n  \"status\": \"done\",\n  \"progress_points\": 100\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "message": "Assigned task status updated successfully",
+          "data": {
+            "id": 1,
+            "status": "done",
+            "progress_points": 100,
+            "updated_at": "2025-05-25T16:00:00.000000Z"
+          }
+        }
+      }
+    },
+    {
+      "name": "Submit Task Feedback",
+      "description": "Submits feedback and optional rating for a completed assigned task",
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "{{base_url}}/api/time-management/assigned-tasks/1/feedback",
+          "host": ["{{base_url}}"],
+          "path": ["api", "time-management", "assigned-tasks", "1", "feedback"]
+        },
+        "headers": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "raw": "{\n  \"feedback\": \"Task completed successfully. Found 3 issues that were fixed.\",\n  \"rating\": 4\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "message": "Task feedback submitted successfully",
+          "data": {
+            "task_id": 1,
+            "feedback": "Task completed successfully. Found 3 issues that were fixed.",
+            "rating": 4,
+            "submitted_at": "2025-05-25T16:15:00.000000Z"
+          }
+        }
+      }
+    }
+  ],
+  "notes": {
+    "implemented_endpoints": [
+      "GET /api/time-management/dashboard -> TimeManagementController@getDashboard (alias for getEmployeeDashboard)",
+      "GET /api/time-management/analytics -> TimeManagementController@getAnalytics",
+      "GET /api/time-management/important-tasks -> TimeManagementController@getImportantTasks",
+      "GET /api/time-management/personal-tasks -> TimeManagementController@getPersonalTasks",
+      "POST /api/time-management/personal-tasks -> TimeManagementController@storePersonalTask (alias for createPersonalTask)",
+      "PUT /api/time-management/personal-tasks/{id} -> TimeManagementController@updatePersonalTask",
+      "DELETE /api/time-management/personal-tasks/{id} -> TimeManagementController@deletePersonalTask",
+      "PUT /api/time-management/personal-tasks/{id}/status -> TimeManagementController@updatePersonalTaskStatus",
+      "GET /api/time-management/project-tasks -> TimeManagementController@getProjectTasks",
+      "PUT /api/time-management/project-tasks/{id}/status -> TimeManagementController@updateProjectTaskStatus",
+      "POST /api/time-management/project-tasks/{id}/time-spent -> TimeManagementController@logTimeSpent",
+      "GET /api/time-management/assigned-tasks -> TimeManagementController@getAssignedTasks",
+      "PUT /api/time-management/assigned-tasks/{id}/status -> TimeManagementController@updateAssignedTaskStatus",
+      "POST /api/time-management/assigned-tasks/{id}/feedback -> TimeManagementController@submitTaskFeedback"
+    ],
+    "route_controller_alignment": "All routes now properly aligned with implemented controller methods. Alias methods added for route naming compatibility.",
+    "total_endpoints": 13,
+    "categories": {
+      "dashboard_analytics": 3,
+      "personal_tasks": 5,
+      "project_tasks": 3,
+      "assigned_tasks": 3
+    }
+  }
+}
