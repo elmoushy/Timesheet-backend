@@ -197,16 +197,205 @@ class DepartmentManagerController extends Controller
     }
 
     /**
-     * Assign task to employee
+     * Assign task to one or multiple employees
      */
     public function assignTask(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'task_id' => 'required|integer|exists:xxx_tasks,id',
+            'employee_id' => 'required_without:employee_ids|integer|exists:xxx_employees,id',
+            'employee_ids' => 'required_without:employee_id|array|min:1',
+            'employee_ids.*' => 'integer|exists:xxx_employees,id',
+            'due_date' => 'nullable|date',
+            'estimated_hours' => 'nullable|integer|min:0',
+            'permission_level' => 'required|in:view_only,edit_progress,full_edit',
+            'assignment_notes' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->fail($validator->errors()->first(), 422);
+        }
+
+        try {
+            if (!$this->isDepartmentManager()) {
+                return $this->fail('Access denied. Department manager role required.', 403);
+            }
+
+            $manager = Auth::user();
+            $managedDepartmentIds = $this->getManagedDepartmentIds();
+
+            // Verify task belongs to managed department
+            $task = Task::whereIn('department_id', $managedDepartmentIds)->find($request->task_id);
+            if (!$task) {
+                return $this->fail('Task not found in your managed departments', 404);
+            }
+
+            // Get employee IDs (support both single and multiple)
+            $employeeIds = $request->has('employee_ids') ? $request->employee_ids : [$request->employee_id];
+
+            // Verify all employees belong to managed departments
+            $employees = Employee::whereIn('department_id', $managedDepartmentIds)
+                ->whereIn('id', $employeeIds)
+                ->get();
+
+            if ($employees->count() !== count($employeeIds)) {
+                return $this->fail('Some employees not found in your managed departments', 404);
+            }
+
+            $assignedTasks = [];
+            $alreadyAssigned = [];
+            $errors = [];
+
+            DB::beginTransaction();
+
+            foreach ($employeeIds as $employeeId) {
+                try {
+                    // Check if task is already assigned to this employee
+                    $existingAssignment = AssignedTask::where('task_id', $request->task_id)
+                        ->where('assigned_to', $employeeId)
+                        ->first();
+
+                    if ($existingAssignment) {
+                        $employee = $employees->find($employeeId);
+                        $alreadyAssigned[] = $employee ? $employee->getFullNameAttribute() : "Employee ID: $employeeId";
+                        continue;
+                    }
+
+                    // Create task assignment
+                    $assignedTask = AssignedTask::create([
+                        'task_id' => $request->task_id,
+                        'assigned_to' => $employeeId,
+                        'assigned_by' => $manager->id,
+                        'due_date' => $request->due_date,
+                        'estimated_hours' => $request->estimated_hours,
+                        'permission_level' => $request->permission_level,
+                        'assignment_notes' => $request->assignment_notes,
+                    ]);
+
+                    // Update employee workload if estimated hours provided
+                    if ($request->estimated_hours) {
+                        $this->updateEmployeeWorkload($employeeId, $request->estimated_hours);
+                    }
+
+                    // Log activity
+                    $this->logTaskActivity('assigned', $assignedTask->id, $manager->id, 'created');
+
+                    $assignedTasks[] = $assignedTask;
+
+                } catch (Throwable $e) {
+                    $employee = $employees->find($employeeId);
+                    $employeeName = $employee ? $employee->getFullNameAttribute() : "Employee ID: $employeeId";
+                    $errors[] = "Failed to assign to $employeeName: " . $e->getMessage();
+                }
+            }
+
+            DB::commit();
+
+            // Load relationships for assigned tasks
+            foreach ($assignedTasks as $assignedTask) {
+                $assignedTask->load(['masterTask', 'assignedEmployee', 'assignedByManager']);
+            }
+
+            $response = [
+                'assigned_tasks' => $assignedTasks,
+                'total_assigned' => count($assignedTasks),
+                'already_assigned' => $alreadyAssigned,
+                'errors' => $errors,
+            ];
+
+            $message = count($assignedTasks) > 0
+                ? 'Task assignment completed successfully'
+                : 'No new assignments were made';
+
+            return $this->ok($message, $response);
+
+        } catch (Throwable $e) {
+            DB::rollBack();
+            return $this->fail('Error assigning task: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Remove/Delete user assignment from a task
+     */
+    public function removeTaskAssignment(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'task_id' => 'required|integer|exists:xxx_tasks,id',
+            'employee_id' => 'required|integer|exists:xxx_employees,id',
+            'reason' => 'nullable|string|max:500',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->fail($validator->errors()->first(), 422);
+        }
+
+        try {
+            if (!$this->isDepartmentManager()) {
+                return $this->fail('Access denied. Department manager role required.', 403);
+            }
+
+            $manager = Auth::user();
+            $managedDepartmentIds = $this->getManagedDepartmentIds();
+
+            // Verify task belongs to managed department
+            $task = Task::whereIn('department_id', $managedDepartmentIds)->find($request->task_id);
+            if (!$task) {
+                return $this->fail('Task not found in your managed departments', 404);
+            }
+
+            // Verify employee belongs to managed department
+            $employee = Employee::whereIn('department_id', $managedDepartmentIds)->find($request->employee_id);
+            if (!$employee) {
+                return $this->fail('Employee not found in your managed departments', 404);
+            }
+
+            // Find the assigned task
+            $assignedTask = AssignedTask::where('task_id', $request->task_id)
+                ->where('assigned_to', $request->employee_id)
+                ->first();
+
+            if (!$assignedTask) {
+                return $this->fail('Task assignment not found for this employee', 404);
+            }
+
+            DB::beginTransaction();
+
+            // Update employee workload if estimated hours were provided
+            if ($assignedTask->estimated_hours) {
+                $this->updateEmployeeWorkload($request->employee_id, -$assignedTask->estimated_hours);
+            }
+
+            // Delete the assignment (no logging needed)
+            $assignedTask->delete();
+
+            DB::commit();
+
+            return $this->ok('Task assignment removed successfully', [
+                'task_id' => $request->task_id,
+                'employee_id' => $request->employee_id,
+                'employee_name' => $employee->getFullNameAttribute(),
+                'task_title' => $task->title,
+                'reason' => $request->reason,
+            ]);
+
+        } catch (Throwable $e) {
+            DB::rollBack();
+            return $this->fail('Error removing task assignment: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Update existing task assignment
+     */
+    public function updateTaskAssignment(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
             'task_id' => 'required|integer|exists:xxx_tasks,id',
             'employee_id' => 'required|integer|exists:xxx_employees,id',
             'due_date' => 'nullable|date',
             'estimated_hours' => 'nullable|integer|min:0',
-            'permission_level' => 'required|in:view_only,edit_progress,full_edit',
+            'permission_level' => 'nullable|in:view_only,edit_progress,full_edit',
             'assignment_notes' => 'nullable|string',
         ]);
 
@@ -234,45 +423,172 @@ class DepartmentManagerController extends Controller
                 return $this->fail('Employee not found in your managed departments', 404);
             }
 
-            // Check if task is already assigned to this employee
-            $existingAssignment = AssignedTask::where('task_id', $request->task_id)
+            // Find the assigned task
+            $assignedTask = AssignedTask::where('task_id', $request->task_id)
                 ->where('assigned_to', $request->employee_id)
                 ->first();
 
-            if ($existingAssignment) {
-                return $this->fail('Task is already assigned to this employee', 422);
+            if (!$assignedTask) {
+                return $this->fail('Task assignment not found for this employee', 404);
             }
 
             DB::beginTransaction();
 
-            // Create task assignment
-            $assignedTask = AssignedTask::create([
-                'task_id' => $request->task_id,
-                'assigned_to' => $request->employee_id,
-                'assigned_by' => $manager->id,
-                'due_date' => $request->due_date,
-                'estimated_hours' => $request->estimated_hours,
-                'permission_level' => $request->permission_level,
-                'assignment_notes' => $request->assignment_notes,
-            ]);
+            // Store old values for logging
+            $oldValues = [
+                'due_date' => $assignedTask->due_date,
+                'estimated_hours' => $assignedTask->estimated_hours,
+                'permission_level' => $assignedTask->permission_level,
+                'assignment_notes' => $assignedTask->assignment_notes,
+            ];
 
-            // Update employee workload if estimated hours provided
-            if ($request->estimated_hours) {
-                $this->updateEmployeeWorkload($request->employee_id, $request->estimated_hours);
+            // Prepare update data
+            $updateData = [];
+            $changedFields = [];
+
+            if ($request->has('due_date')) {
+                $updateData['due_date'] = $request->due_date;
+                if ($oldValues['due_date'] !== $request->due_date) {
+                    $changedFields[] = 'due_date';
+                }
             }
 
-            // Log activity
-            $this->logTaskActivity('assigned', $assignedTask->id, $manager->id, 'created');
+            if ($request->has('estimated_hours')) {
+                $updateData['estimated_hours'] = $request->estimated_hours;
+                if ($oldValues['estimated_hours'] !== $request->estimated_hours) {
+                    $changedFields[] = 'estimated_hours';
+
+                    // Update employee workload
+                    $hoursDifference = $request->estimated_hours - ($oldValues['estimated_hours'] ?? 0);
+                    if ($hoursDifference !== 0) {
+                        $this->updateEmployeeWorkload($request->employee_id, $hoursDifference);
+                    }
+                }
+            }
+
+            if ($request->has('permission_level')) {
+                $updateData['permission_level'] = $request->permission_level;
+                if ($oldValues['permission_level'] !== $request->permission_level) {
+                    $changedFields[] = 'permission_level';
+                }
+            }
+
+            if ($request->has('assignment_notes')) {
+                $updateData['assignment_notes'] = $request->assignment_notes;
+                if ($oldValues['assignment_notes'] !== $request->assignment_notes) {
+                    $changedFields[] = 'assignment_notes';
+                }
+            }
+
+            if (empty($updateData)) {
+                return $this->fail('No valid fields to update', 422);
+            }
+
+            // Update the assignment
+            $assignedTask->update($updateData);
+
+            // Log activities for changed fields
+            foreach ($changedFields as $field) {
+                $this->logTaskActivity('assigned', $assignedTask->id, $manager->id, 'updated',
+                    $field, $oldValues[$field], $updateData[$field] ?? null);
+            }
 
             DB::commit();
 
             $assignedTask->load(['masterTask', 'assignedEmployee', 'assignedByManager']);
 
-            return $this->ok('Task assigned successfully', $assignedTask);
+            return $this->ok('Task assignment updated successfully', [
+                'assigned_task' => $assignedTask,
+                'updated_fields' => $changedFields,
+                'old_values' => array_intersect_key($oldValues, array_flip($changedFields)),
+                'new_values' => array_intersect_key($updateData, array_flip($changedFields)),
+            ]);
 
         } catch (Throwable $e) {
             DB::rollBack();
-            return $this->fail('Error assigning task: ' . $e->getMessage(), 500);
+            return $this->fail('Error updating task assignment: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Get specific task assignment details by task_id and employee_id
+     */
+    public function getTaskAssignmentDetails(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'task_id' => 'required|integer|exists:xxx_tasks,id',
+            'employee_id' => 'required|integer|exists:xxx_employees,id',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->fail($validator->errors()->first(), 422);
+        }
+
+        try {
+            if (!$this->isDepartmentManager()) {
+                return $this->fail('Access denied. Department manager role required.', 403);
+            }
+
+            $managedDepartmentIds = $this->getManagedDepartmentIds();
+
+            // Verify task belongs to managed department
+            $task = Task::whereIn('department_id', $managedDepartmentIds)->find($request->task_id);
+            if (!$task) {
+                return $this->fail('Task not found in your managed departments', 404);
+            }
+
+            // Verify employee belongs to managed department
+            $employee = Employee::whereIn('department_id', $managedDepartmentIds)->find($request->employee_id);
+            if (!$employee) {
+                return $this->fail('Employee not found in your managed departments', 404);
+            }
+
+            // Find the assigned task
+            $assignedTask = AssignedTask::where('task_id', $request->task_id)
+                ->where('assigned_to', $request->employee_id)
+                ->with(['masterTask', 'assignedEmployee', 'assignedByManager'])
+                ->first();
+
+            if (!$assignedTask) {
+                return $this->fail('Task assignment not found for this employee', 404);
+            }
+
+            // Format the response with the requested details
+            $assignmentDetails = [
+                'assignment_id' => $assignedTask->id,
+                'task_id' => $assignedTask->task_id,
+                'employee_id' => $assignedTask->assigned_to,
+                'due_date' => $assignedTask->due_date,
+                'estimated_hours' => $assignedTask->estimated_hours,
+                'permission_level' => $assignedTask->permission_level,
+                'assignment_notes' => $assignedTask->assignment_notes,
+                'status' => $assignedTask->status,
+                'is_important' => $assignedTask->is_important,
+                'is_pinned' => $assignedTask->is_pinned,
+                'created_at' => $assignedTask->created_at,
+                'updated_at' => $assignedTask->updated_at,
+                'task' => [
+                    'id' => $assignedTask->masterTask->id ?? null,
+                    'title' => $assignedTask->masterTask->title ?? 'Unknown Task',
+                    'description' => $assignedTask->masterTask->description ?? '',
+                ],
+                'employee' => [
+                    'id' => $assignedTask->assignedEmployee->id ?? null,
+                    'first_name' => $assignedTask->assignedEmployee->first_name ?? '',
+                    'last_name' => $assignedTask->assignedEmployee->last_name ?? '',
+                    'email' => $assignedTask->assignedEmployee->work_email ?? '',
+                ],
+                'assigned_by' => [
+                    'id' => $assignedTask->assignedByManager->id ?? null,
+                    'first_name' => $assignedTask->assignedByManager->first_name ?? '',
+                    'last_name' => $assignedTask->assignedByManager->last_name ?? '',
+                ],
+            ];
+
+            return $this->ok('Task assignment details retrieved successfully', $assignmentDetails);
+
+        } catch (Throwable $e) {
+            return $this->fail('Error retrieving task assignment details: ' . $e->getMessage(), 500);
         }
     }
 

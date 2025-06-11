@@ -254,7 +254,7 @@
     },
     {
       "name": "Assign Task",
-      "description": "Assigns a task to an employee in the managed departments with specified permissions and details",
+      "description": "Assigns a task to one or multiple employees in the managed departments with specified permissions and details. Supports both single employee assignment and bulk assignment to multiple employees.",
       "request": {
         "method": "POST",
         "url": {
@@ -271,49 +271,57 @@
           "mode": "raw",
           "raw": {
             "task_id": 1,
-            "employee_id": 3,
+            "employee_ids": [3, 5, 7],
             "due_date": "2025-06-01",
             "estimated_hours": 16,
             "permission_level": "full_edit",
-            "assignment_notes": "High priority task, coordinate with frontend team"
+            "assignment_notes": "High priority task, coordinate with frontend team",
+            "_note": "Use 'employee_id' for single assignment or 'employee_ids' for multiple assignments"
           }
         }
       },
       "response": {
         "status": 200,
         "body": {
-          "message": "Task assigned successfully",
+          "message": "Task assignment completed successfully",
           "data": {
-            "id": 15,
-            "task_id": 1,
-            "assigned_to": 3,
-            "assigned_by": 1,
-            "due_date": "2025-06-01",
-            "estimated_hours": 16,
-            "permission_level": "full_edit",
-            "assignment_notes": "High priority task, coordinate with frontend team",
-            "status": "to-do",
-            "progress_points": 0,
-            "actual_hours": 0,
-            "is_important": false,
-            "is_pinned": false,
-            "created_at": "2025-05-25T11:00:00.000000Z",
-            "updated_at": "2025-05-25T11:00:00.000000Z",
-            "task": {
-              "id": 1,
-              "title": "Frontend UI Development",
-              "description": "Develop responsive user interface components"
-            },
-            "assigned_to_employee": {
-              "id": 3,
-              "first_name": "Alice",
-              "last_name": "Johnson"
-            },
-            "assigned_by_employee": {
-              "id": 1,
-              "first_name": "Manager",
-              "last_name": "Smith"
-            }
+            "assigned_tasks": [
+              {
+                "id": 15,
+                "task_id": 1,
+                "assigned_to": 3,
+                "assigned_by": 1,
+                "due_date": "2025-06-01",
+                "estimated_hours": 16,
+                "permission_level": "full_edit",
+                "assignment_notes": "High priority task, coordinate with frontend team",
+                "status": "to-do",
+                "progress_points": 0,
+                "actual_hours": 0,
+                "is_important": false,
+                "is_pinned": false,
+                "created_at": "2025-05-25T11:00:00.000000Z",
+                "updated_at": "2025-05-25T11:00:00.000000Z",
+                "task": {
+                  "id": 1,
+                  "title": "Frontend UI Development",
+                  "description": "Develop responsive user interface components"
+                },
+                "assigned_to_employee": {
+                  "id": 3,
+                  "first_name": "Alice",
+                  "last_name": "Johnson"
+                },
+                "assigned_by_employee": {
+                  "id": 1,
+                  "first_name": "Manager",
+                  "last_name": "Smith"
+                }
+              }
+            ],
+            "total_assigned": 3,
+            "already_assigned": ["John Doe"],
+            "errors": []
           }
         }
       },
@@ -343,6 +351,255 @@
           "status": 500,
           "body": {
             "message": "Error assigning task: [error details]",
+            "data": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "Remove Task Assignment",
+      "description": "Removes/deletes a user assignment from a task and updates employee workload accordingly",
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "{{base_url}}/api/department-manager/task-assignment/remove",
+          "host": ["{{base_url}}"],
+          "path": ["api", "department-manager", "task-assignment", "remove"]
+        },
+        "headers": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": {
+            "task_id": 1,
+            "employee_id": 3,
+            "reason": "Task no longer required for this employee"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "message": "Task assignment removed successfully",
+          "data": {
+            "task_id": 1,
+            "employee_id": 3,
+            "employee_name": "Alice Johnson",
+            "task_title": "Frontend UI Development",
+            "reason": "Task no longer required for this employee"
+          }
+        }
+      },
+      "errorResponses": [
+        {
+          "status": 403,
+          "body": {
+            "message": "Access denied. Department manager role required.",
+            "data": []
+          }
+        },
+        {
+          "status": 404,
+          "body": {
+            "message": "Task assignment not found for this employee",
+            "data": []
+          }
+        },
+        {
+          "status": 500,
+          "body": {
+            "message": "Error removing task assignment: [error details]",
+            "data": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "Update Task Assignment",
+      "description": "Updates an existing task assignment's due date, estimated hours, permission level, and assignment notes",
+      "request": {
+        "method": "PUT",
+        "url": {
+          "raw": "{{base_url}}/api/department-manager/task-assignment/update",
+          "host": ["{{base_url}}"],
+          "path": ["api", "department-manager", "task-assignment", "update"]
+        },
+        "headers": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": {
+            "task_id": 1,
+            "employee_id": 3,
+            "due_date": "2025-07-01",
+            "estimated_hours": 24,
+            "permission_level": "full_edit",
+            "assignment_notes": "Updated requirements - additional features needed"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "message": "Task assignment updated successfully",
+          "data": {
+            "assigned_task": {
+              "id": 15,
+              "task_id": 1,
+              "assigned_to": 3,
+              "assigned_by": 1,
+              "due_date": "2025-07-01",
+              "estimated_hours": 24,
+              "permission_level": "full_edit",
+              "assignment_notes": "Updated requirements - additional features needed",
+              "status": "to-do",
+              "created_at": "2025-05-25T11:00:00.000000Z",
+              "updated_at": "2025-06-11T15:30:00.000000Z",
+              "task": {
+                "id": 1,
+                "title": "Frontend UI Development",
+                "description": "Develop responsive user interface components"
+              },
+              "assigned_to_employee": {
+                "id": 3,
+                "first_name": "Alice",
+                "last_name": "Johnson"
+              },
+              "assigned_by_employee": {
+                "id": 1,
+                "first_name": "Manager",
+                "last_name": "Smith"
+              }
+            },
+            "updated_fields": ["due_date", "estimated_hours", "assignment_notes"],
+            "old_values": {
+              "due_date": "2025-06-01",
+              "estimated_hours": 16,
+              "assignment_notes": "High priority task, coordinate with frontend team"
+            },
+            "new_values": {
+              "due_date": "2025-07-01",
+              "estimated_hours": 24,
+              "assignment_notes": "Updated requirements - additional features needed"
+            }
+          }
+        }
+      },
+      "errorResponses": [
+        {
+          "status": 403,
+          "body": {
+            "message": "Access denied. Department manager role required.",
+            "data": []
+          }
+        },
+        {
+          "status": 404,
+          "body": {
+            "message": "Task assignment not found for this employee",
+            "data": []
+          }
+        },
+        {
+          "status": 422,
+          "body": {
+            "message": "No valid fields to update",
+            "data": []
+          }
+        },
+        {
+          "status": 500,
+          "body": {
+            "message": "Error updating task assignment: [error details]",
+            "data": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Task Assignment Details",
+      "description": "Retrieves specific task assignment details including due date, estimated hours, permission level, and assignment notes by task_id and employee_id",
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "{{base_url}}/api/department-manager/task-assignment/details",
+          "host": ["{{base_url}}"],
+          "path": ["api", "department-manager", "task-assignment", "details"]
+        },
+        "headers": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Accept", "value": "application/json" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": {
+            "task_id": 1,
+            "employee_id": 2
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "message": "Task assignment details retrieved successfully",
+          "data": {
+            "assignment_id": 15,
+            "task_id": 1,
+            "employee_id": 2,
+            "due_date": "2025-07-01",
+            "estimated_hours": 24,
+            "permission_level": "full_edit",
+            "assignment_notes": "Updated requirements - additional features needed",
+            "status": "to-do",
+            "is_important": true,
+            "is_pinned": false,
+            "created_at": "2025-05-25T11:00:00.000000Z",
+            "updated_at": "2025-06-11T15:30:00.000000Z",
+            "task": {
+              "id": 1,
+              "title": "Frontend UI Development",
+              "description": "Develop responsive user interface components"
+            },
+            "employee": {
+              "id": 2,
+              "first_name": "John",
+              "last_name": "Smith",
+              "email": "john.smith@company.com"
+            },
+            "assigned_by": {
+              "id": 1,
+              "first_name": "Manager",
+              "last_name": "Admin"
+            }
+          }
+        }
+      },
+      "errorResponses": [
+        {
+          "status": 403,
+          "body": {
+            "message": "Access denied. Department manager role required.",
+            "data": []
+          }
+        },
+        {
+          "status": 404,
+          "body": {
+            "message": "Task assignment not found for this employee",
+            "data": []
+          }
+        },
+        {
+          "status": 500,
+          "body": {
+            "message": "Error retrieving task assignment details: [error details]",
             "data": []
           }
         }
@@ -578,6 +835,9 @@
       "GET /api/department-manager/task-assignment/employees -> DepartmentManagerController@getManagedEmployees",
       "GET /api/department-manager/task-assignment/employees/simple -> DepartmentManagerController@getManagedEmployeesSimple",
       "POST /api/department-manager/task-assignment/assign -> DepartmentManagerController@assignTask",
+      "POST /api/department-manager/task-assignment/remove -> DepartmentManagerController@removeTaskAssignment",
+      "PUT /api/department-manager/task-assignment/update -> DepartmentManagerController@updateTaskAssignment",
+      "POST /api/department-manager/task-assignment/details -> DepartmentManagerController@getTaskAssignmentDetails",
       "GET /api/department-manager/workload-heatmap -> DepartmentManagerController@getWorkloadHeatmap",
       "POST /api/department-manager/bulk-operations/* -> DepartmentManagerController@bulkTaskOperation",
       "GET /api/department-manager/employees/{employeeId}/assigned-tasks -> DepartmentController@getEmployeeAssignedTasks"

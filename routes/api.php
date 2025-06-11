@@ -250,6 +250,9 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/employees', [DepartmentManagerController::class, 'getManagedEmployees']);
             Route::get('/employees/simple', [DepartmentManagerController::class, 'getManagedEmployeesSimple']);
             Route::post('/assign', [DepartmentManagerController::class, 'assignTask']);
+            Route::post('/remove', [DepartmentManagerController::class, 'removeTaskAssignment']);
+            Route::put('/update', [DepartmentManagerController::class, 'updateTaskAssignment']);
+            Route::post('/details', [DepartmentManagerController::class, 'getTaskAssignmentDetails']);
             Route::get('/assigned-tasks', [DepartmentManagerController::class, 'getAssignedTasks']);
             Route::put('/{id}/permissions', [DepartmentManagerController::class, 'updateTaskPermissions']);
             Route::put('/{id}/status', [DepartmentManagerController::class, 'updateTaskStatus']);
