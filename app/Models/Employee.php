@@ -58,6 +58,7 @@ class Employee extends Authenticatable
      */
     protected $hidden = [
         'password',
+        'image_path', // Hide raw binary data from JSON serialization
     ];
 
     /**
@@ -77,6 +78,211 @@ class Employee extends Authenticatable
         'employee_type' => 'string',
         'user_status' => 'string',
     ];
+
+    /**
+     * The attributes that should be appended to the model's array form.
+     *
+     * @var array
+     */
+    protected $appends = ['image_url', 'optimized_image_url'];
+
+    /**
+     * Get the image as base64 string.
+     *
+     * @return string|null
+     */
+    public function getImageBase64Attribute()
+    {
+        if (isset($this->attributes['image_path']) && $this->attributes['image_path']) {
+            // Ensure the stored data is valid base64
+            $data = $this->attributes['image_path'];
+
+            // If it's already base64 encoded, validate it
+            if (base64_decode($data, true) !== false) {
+                return $data;
+            }
+
+            // If it's binary data, encode it
+            return base64_encode($data);
+        }
+        return null;
+    }
+
+    /**
+     * Set the image from base64 string.
+     *
+     * @param string|null $value
+     * @return void
+     */
+    public function setImageBase64Attribute($value)
+    {
+        if ($value) {
+            // Ensure we store as base64 encoded string to avoid UTF-8 issues
+            if (base64_decode($value, true) !== false) {
+                // Already base64 encoded
+                $this->attributes['image_path'] = $value;
+            } else {
+                // Encode binary data
+                $this->attributes['image_path'] = base64_encode($value);
+            }
+        }
+    }
+
+    /**
+     * Get the image URL for display.
+     *
+     * @return string|null
+     */
+    public function getImageUrlAttribute()
+    {
+        if (isset($this->attributes['image_path']) && $this->attributes['image_path']) {
+            try {
+                $base64Data = $this->getImageBase64Attribute();
+                if ($base64Data) {
+                    $mimeType = $this->getImageMimeType() ?: 'image/jpeg';
+                    return "data:{$mimeType};base64,{$base64Data}";
+                }
+            } catch (\Exception $e) {
+                // Return null if there's an encoding issue
+                return null;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Validate image data format
+     *
+     * @param string $imageData
+     * @return bool
+     */
+    public static function validateImageData($imageData): bool
+    {
+        if (empty($imageData)) {
+            return false;
+        }
+
+        try {
+            // Check if it's a valid image by trying to get info
+            $tempFile = tempnam(sys_get_temp_dir(), 'img_validate');
+
+            // Handle both binary and base64 data
+            if (base64_decode($imageData, true) !== false) {
+                // It's base64 encoded, decode it first
+                $binaryData = base64_decode($imageData);
+            } else {
+                // It's binary data
+                $binaryData = $imageData;
+            }
+
+            file_put_contents($tempFile, $binaryData);
+            $imageInfo = @getimagesize($tempFile);
+            unlink($tempFile);
+
+            return $imageInfo !== false;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Get image MIME type
+     *
+     * @return string|null
+     */
+    public function getImageMimeType(): ?string
+    {
+        if (!$this->hasImage()) {
+            return null;
+        }
+
+        try {
+            $tempFile = tempnam(sys_get_temp_dir(), 'img_mime');
+            $base64Data = $this->getImageBase64Attribute();
+
+            if (!$base64Data) {
+                return null;
+            }
+
+            // Decode base64 data before writing to temp file
+            $imageData = base64_decode($base64Data);
+            if ($imageData === false) {
+                return null;
+            }
+
+            file_put_contents($tempFile, $imageData);
+            $imageInfo = @getimagesize($tempFile);
+            unlink($tempFile);
+
+            return $imageInfo ? $imageInfo['mime'] : null;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Get optimized image URL with proper MIME type
+     *
+     * @return string|null
+     */
+    public function getOptimizedImageUrlAttribute()
+    {
+        if (!$this->hasImage()) {
+            return null;
+        }
+
+        try {
+            $mimeType = $this->getImageMimeType();
+            $base64Data = $this->getImageBase64Attribute();
+
+            if (!$base64Data) {
+                return null;
+            }
+
+            if ($mimeType) {
+                return "data:{$mimeType};base64,{$base64Data}";
+            }
+
+            // Fallback to JPEG if MIME type detection fails
+            return "data:image/jpeg;base64,{$base64Data}";
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Check if employee has an image.
+     *
+     * @return bool
+     */
+    public function hasImage(): bool
+    {
+        return isset($this->attributes['image_path']) &&
+               !empty($this->attributes['image_path']) &&
+               $this->getImageBase64Attribute() !== null;
+    }
+
+    /**
+     * Get the image size in bytes.
+     *
+     * @return int
+     */
+    public function getImageSize(): int
+    {
+        if (isset($this->attributes['image_path']) && $this->attributes['image_path']) {
+            try {
+                $base64Data = $this->getImageBase64Attribute();
+                if ($base64Data) {
+                    // Calculate the size of the decoded image data
+                    $decodedData = base64_decode($base64Data);
+                    return $decodedData ? strlen($decodedData) : 0;
+                }
+            } catch (\Exception $e) {
+                return 0;
+            }
+        }
+        return 0;
+    }
 
     /**
      * Hash the password before saving.
@@ -199,6 +405,67 @@ class Employee extends Authenticatable
     public function roles()
     {
         return $this->belongsToMany(Role::class, 'xxx_employee_role', 'employee_id', 'role_id');
+    }
+
+    /**
+     * Get user roles for this employee (new system)
+     */
+    public function userRoles()
+    {
+        return $this->hasMany(UserRole::class, 'user_id', 'id');
+    }
+
+    /**
+     * Get active user roles for this employee
+     */
+    public function activeUserRoles()
+    {
+        return $this->hasMany(UserRole::class, 'user_id', 'id')->active();
+    }
+
+    /**
+     * Get roles assigned to this employee via the new user_roles table
+     */
+    public function rolesViaUserRoles()
+    {
+        return $this->belongsToMany(Role::class, 'xxx_user_roles', 'user_id', 'role_id')
+                    ->wherePivot('is_active', true)
+                    ->withPivot('is_active', 'assigned_by')
+                    ->withTimestamps();
+    }
+
+    /**
+     * Get user roles that this employee has assigned to others
+     */
+    public function assignedUserRoles()
+    {
+        return $this->hasMany(UserRole::class, 'assigned_by', 'id');
+    }
+
+    /**
+     * Check if employee has access to a specific page
+     */
+    public function hasPageAccess($pageId): bool
+    {
+        return $this->rolesViaUserRoles()
+                    ->whereHas('pages', function ($query) use ($pageId) {
+                        $query->where('xxx_pages.id', $pageId)
+                              ->where('xxx_page_role_permissions.is_active', true);
+                    })
+                    ->exists();
+    }
+
+    /**
+     * Get all pages accessible to this employee through their roles
+     */
+    public function accessiblePages()
+    {
+        $roleIds = $this->activeUserRoles()->pluck('role_id');
+
+        return Page::whereHas('roles', function ($query) use ($roleIds) {
+            $query->whereIn('xxx_roles.id', $roleIds)
+                  ->where('xxx_page_role_permissions.is_active', true);
+        })->where('is_active', true)->get();
     }
 
     /* ─────────────────────  Task Management Relationships  ───────────────────── */

@@ -11,8 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('project_tasks', function (Blueprint $table) {
-            //
+        Schema::create('xxx_pages', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->string('name', 150);        // e.g. 'Timesheet Dashboard'
+            $table->boolean('is_active')->default(true);
+            $table->timestamps();
+            $table->index('is_active');
         });
     }
 
@@ -21,8 +25,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('project_tasks', function (Blueprint $table) {
-            //
-        });
+        Schema::dropIfExists('xxx_pages');
     }
 };

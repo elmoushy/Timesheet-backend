@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\API\EmployeeController;
+use App\Http\Controllers\API\SupportController;
 use App\Http\Controllers\API\DepartmentController;
 use App\Http\Controllers\API\ClientController;
 use App\Http\Controllers\API\ApplicationController;
@@ -13,6 +14,11 @@ use App\Http\Controllers\API\TimesheetController;
 use App\Http\Controllers\API\ProjectAssignEmployeeController;
 use App\Http\Controllers\API\TimeManagementController;
 use App\Http\Controllers\API\DepartmentManagerController;
+use App\Http\Controllers\API\PageController;
+use App\Http\Controllers\API\RoleController;
+use App\Http\Controllers\API\UserRoleController;
+use App\Http\Controllers\API\PageRolePermissionController;
+use App\Http\Controllers\API\TestController;
 
 
 /*
@@ -28,14 +34,38 @@ use App\Http\Controllers\API\DepartmentManagerController;
 
 // Employee routes - publicly accessible
 Route::prefix('employees')->group(function () {
+    Route::get('/all', [EmployeeController::class, 'all'])
+     ->middleware('auth:sanctum');
     Route::get('/', [EmployeeController::class, 'index']);
     Route::get('/search', [EmployeeController::class, 'search']); // New route for dropdown search
-    Route::get('/{id}', [EmployeeController::class, 'show']);
-    Route::post('/', [EmployeeController::class, 'store']);
+    Route::get('/{id}', [EmployeeController::class, 'show'])
+         ->whereNumber('id');    Route::post('/', [EmployeeController::class, 'store']);
     Route::post('/{id}', [EmployeeController::class, 'update']);
     Route::delete('/{id}', [EmployeeController::class, 'destroy']);
     Route::post('/bulk-delete', [EmployeeController::class, 'bulkDestroy']);
     Route::post('/{id}/upload-image', [EmployeeController::class, 'uploadImage']); // New route for image upload
+    Route::get('/{id}/image', [EmployeeController::class, 'getImage']); // Get employee image
+    Route::delete('/{id}/image', [EmployeeController::class, 'deleteImage']); // Delete employee image
+});
+
+// Support routes - publicly accessible
+Route::prefix('support')->group(function () {
+    Route::get('/', [SupportController::class, 'index']);
+    Route::get('/all', [SupportController::class, 'all']);
+    Route::get('/search', [SupportController::class, 'search']);
+    Route::get('/{id}', [SupportController::class, 'show'])
+         ->whereNumber('id');
+    Route::get('/{id}/image', [SupportController::class, 'getImage']);
+
+    // Authenticated routes
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::post('/', [SupportController::class, 'store']);
+        Route::post('/{id}', [SupportController::class, 'update']);
+        Route::delete('/{id}', [SupportController::class, 'destroy']);
+        Route::post('/bulk-delete', [SupportController::class, 'bulkDestroy']);
+        Route::post('/{id}/upload-image', [SupportController::class, 'uploadImage']);
+        Route::delete('/{id}/image', [SupportController::class, 'deleteImage']);
+    });
 });
 
 // Department routes
@@ -143,6 +173,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Auth verification
     Route::get('/check-token', [AuthController::class, 'checkToken']);
     Route::post('/logout', [AuthController::class, 'logout']);
+
 
     // Get projects assigned to authenticated user (no pagination)
     Route::get('/my-assigned-projects', [ProjectController::class, 'getMyAssignedProjects']);
@@ -289,5 +320,79 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/export/department-report', [DepartmentManagerController::class, 'exportDepartmentReport']);
         });
     });
+});
+
+// =====================================
+// Permission Management Routes
+// =====================================
+
+// Pages routes
+Route::prefix('pages')->group(function () {
+    Route::get('/', [PageController::class, 'index']);
+    Route::get('/{id}', [PageController::class, 'show']);
+    Route::post('/', [PageController::class, 'store']);
+    Route::put('/{id}', [PageController::class, 'update']);
+    Route::delete('/{id}', [PageController::class, 'destroy']);
+    Route::patch('/{id}/toggle-status', [PageController::class, 'toggleStatus']);
+});
+
+// Roles routes (enhanced)
+Route::prefix('roles')->group(function () {
+    Route::get('/', [RoleController::class, 'index']);
+    Route::get('/{id}', [RoleController::class, 'show']);
+    Route::post('/', [RoleController::class, 'store']);
+    Route::put('/{id}', [RoleController::class, 'update']);
+    Route::delete('/{id}', [RoleController::class, 'destroy']);
+    Route::patch('/{id}/toggle-status', [RoleController::class, 'toggleStatus']);
+
+    // Role relationships
+    Route::get('/{id}/users', [RoleController::class, 'getUsers']);
+    Route::get('/{id}/pages', [RoleController::class, 'getPages']);
+});
+
+// User Roles routes
+Route::prefix('user-roles')->group(function () {
+    Route::get('/', [UserRoleController::class, 'index']);
+    Route::get('/{id}', [UserRoleController::class, 'show']);
+    Route::post('/', [UserRoleController::class, 'store']);
+    Route::put('/{id}', [UserRoleController::class, 'update']);
+    Route::delete('/{id}', [UserRoleController::class, 'destroy']);
+    Route::patch('/{id}/toggle-status', [UserRoleController::class, 'toggleStatus']);
+
+    // Bulk operations
+    Route::post('/bulk-assign', [UserRoleController::class, 'bulkAssignToUser']);
+
+    // User and role specific endpoints
+    Route::get('/users/{userId}', [UserRoleController::class, 'getUserRoles']);
+    Route::get('/roles/{roleId}', [UserRoleController::class, 'getRoleUsers']);
+});
+
+// Page Role Permissions routes
+Route::prefix('page-role-permissions')->group(function () {
+    Route::get('/', [PageRolePermissionController::class, 'index']);
+    Route::get('/{id}', [PageRolePermissionController::class, 'show']);
+    Route::post('/', [PageRolePermissionController::class, 'store']);
+    Route::put('/{id}', [PageRolePermissionController::class, 'update']);
+    Route::delete('/{id}', [PageRolePermissionController::class, 'destroy']);
+    Route::patch('/{id}/toggle-status', [PageRolePermissionController::class, 'toggleStatus']);
+
+    // Bulk operations
+    Route::post('/bulk-assign-pages', [PageRolePermissionController::class, 'bulkAssignPagesToRole']);
+
+    // Page and role specific endpoints
+    Route::get('/pages/{pageId}', [PageRolePermissionController::class, 'getPagePermissions']);
+    Route::get('/roles/{roleId}', [PageRolePermissionController::class, 'getRolePermissions']);
+
+    // Permission matrix
+    Route::get('/matrix', [PageRolePermissionController::class, 'getPermissionMatrix']);
+});
+
+// =====================================
+// Test Routes for Debugging
+// =====================================
+Route::prefix('test')->group(function () {
+    Route::get('/utf8', [TestController::class, 'testUtf8']);
+    Route::get('/binary', [TestController::class, 'testBinary']);
+    Route::get('/memory', [TestController::class, 'testMemory']);
 });
 

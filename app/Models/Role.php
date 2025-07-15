@@ -44,4 +44,50 @@ class Role extends Model
     {
         return $this->belongsToMany(Permission::class, 'xxx_permission_role', 'role_id', 'permission_id');
     }
+
+    /**
+     * Get the user roles for this role
+     */
+    public function userRoles()
+    {
+        return $this->hasMany(UserRole::class, 'role_id', 'id');
+    }
+
+    /**
+     * Get the active user roles for this role
+     */
+    public function activeUserRoles()
+    {
+        return $this->hasMany(UserRole::class, 'role_id', 'id')->active();
+    }
+
+    /**
+     * Get the page role permissions for this role
+     */
+    public function pageRolePermissions()
+    {
+        return $this->hasMany(PageRolePermission::class, 'role_id', 'id');
+    }
+
+    /**
+     * Get the pages that this role has permission to access
+     */
+    public function pages()
+    {
+        return $this->belongsToMany(Page::class, 'xxx_page_role_permissions', 'role_id', 'page_id')
+                    ->wherePivot('is_active', true)
+                    ->withPivot('is_active')
+                    ->withTimestamps();
+    }
+
+    /**
+     * Get users (employees) assigned to this role via the user_roles table
+     */
+    public function usersViaUserRoles()
+    {
+        return $this->belongsToMany(Employee::class, 'xxx_user_roles', 'role_id', 'user_id')
+                    ->wherePivot('is_active', true)
+                    ->withPivot('is_active', 'assigned_by')
+                    ->withTimestamps();
+    }
 }

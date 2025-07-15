@@ -1,0 +1,841 @@
+{
+  "description": "Support API endpoints for managing support records and images. This comprehensive API handles all support operations including creation, updates, search, image management, and bulk operations. Implements 13 core endpoints with full CRUD functionality and BLOB-based image storage system.",
+  "base_url": "http://127.0.0.1:8000",
+  "authentication": "Public access - no authentication required",
+  "authorization": "Public access for all endpoints",
+  "note": "13 endpoints are fully implemented with comprehensive validation, error handling, and BLOB-based image storage system.",
+  "items": [
+    {
+      "name": "Get All Support Records (Paginated)",
+      "description": "Retrieves paginated list of support records with advanced search and filtering capabilities including employee filter, image presence filter, and message search",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/api/support?search=help&employee_id=1&has_image=true&per_page=10&page=1",
+          "host": ["{{base_url}}"],
+          "path": ["api", "support"],
+          "query": [
+            {"key": "search", "value": "help", "description": "Search term for message content"},
+            {"key": "employee_id", "value": "1", "description": "Filter by employee ID"},
+            {"key": "has_image", "value": "true", "description": "Filter by image presence (true/false)"},
+            {"key": "per_page", "value": "10", "description": "Number of records per page"},
+            {"key": "page", "value": "1", "description": "Page number"}
+          ]
+        },
+        "headers": [
+          {"key": "Accept", "value": "application/json"}
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "message": "Support records fetched successfully",
+          "data": {
+            "current_page": 1,
+            "data": [
+              {
+                "id": 1,
+                "employee_id": 1,
+                "message": "I need help with my timesheet submission",
+                "support_image_id": 1,
+                "created_at": "2024-01-15T10:30:00.000000Z",
+                "updated_at": "2024-01-15T10:30:00.000000Z",
+                "employee": {
+                  "id": 1,
+                  "employee_code": "EMP001",
+                  "first_name": "John",
+                  "last_name": "Smith",
+                  "job_title": "Senior Developer"
+                },
+                "support_image": {
+                  "id": 1,
+                  "mime_type": "image/jpeg",
+                  "size": 15360,
+                  "original_name": "screenshot.jpg",
+                  "created_at": "2024-01-15T10:30:00.000000Z",
+                  "updated_at": "2024-01-15T10:30:00.000000Z",
+                  "image_url": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...",
+                  "has_image": true
+                }
+              }
+            ],
+            "first_page_url": "http://127.0.0.1:8000/api/support?page=1",
+            "from": 1,
+            "last_page": 3,
+            "last_page_url": "http://127.0.0.1:8000/api/support?page=3",
+            "next_page_url": "http://127.0.0.1:8000/api/support?page=2",
+            "path": "http://127.0.0.1:8000/api/support",
+            "per_page": 10,
+            "prev_page_url": null,
+            "to": 10,
+            "total": 25
+          }
+        }
+      },
+      "errorResponses": [
+        {
+          "status": 500,
+          "body": {
+            "message": "Error retrieving support records: [error details]",
+            "data": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get All Support Records (Non-Paginated)",
+      "description": "Retrieves complete list of support records without pagination, with search filtering. Optimized for analytics and reporting.",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/api/support/all?search=help&employee_id=1",
+          "host": ["{{base_url}}"],
+          "path": ["api", "support", "all"],
+          "query": [
+            {"key": "search", "value": "help", "description": "Search term for message content"},
+            {"key": "employee_id", "value": "1", "description": "Filter by employee ID"}
+          ]
+        },
+        "headers": [
+          {"key": "Accept", "value": "application/json"}
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "message": "All support records fetched successfully",
+          "data": [
+            {
+              "id": 1,
+              "employee_id": 1,
+              "message": "I need help with my timesheet submission",
+              "support_image_id": 1,
+              "created_at": "2024-01-15T10:30:00.000000Z",
+              "updated_at": "2024-01-15T10:30:00.000000Z",
+              "employee": {
+                "id": 1,
+                "employee_code": "EMP001",
+                "first_name": "John",
+                "last_name": "Smith"
+              },
+              "support_image": {
+                "id": 1,
+                "mime_type": "image/jpeg",
+                "size": 15360,
+                "original_name": "screenshot.jpg",
+                "image_url": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...",
+                "has_image": true
+              }
+            }
+          ]
+        }
+      },
+      "errorResponses": [
+        {
+          "status": 500,
+          "body": {
+            "message": "Error retrieving all support records: [error details]",
+            "data": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Support Record by ID",
+      "description": "Retrieves detailed information about a specific support record including employee details and image information",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/api/support/1",
+          "host": ["{{base_url}}"],
+          "path": ["api", "support", "1"]
+        },
+        "headers": [
+          {"key": "Accept", "value": "application/json"}
+        ],
+        "pathVariables": [
+          {
+            "key": "id",
+            "value": "1",
+            "description": "The ID of the support record to retrieve"
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "message": "Support record fetched successfully",
+          "data": {
+            "id": 1,
+            "employee_id": 1,
+            "message": "I need help with my timesheet submission. The system is not allowing me to submit my hours for last week.",
+            "support_image_id": 1,
+            "created_at": "2024-01-15T10:30:00.000000Z",
+            "updated_at": "2024-01-15T10:30:00.000000Z",
+            "employee": {
+              "id": 1,
+              "employee_code": "EMP001",
+              "first_name": "John",
+              "last_name": "Smith",
+              "job_title": "Senior Developer"
+            },
+            "support_image": {
+              "id": 1,
+              "mime_type": "image/jpeg",
+              "size": 15360,
+              "original_name": "screenshot.jpg",
+              "created_at": "2024-01-15T10:30:00.000000Z",
+              "updated_at": "2024-01-15T10:30:00.000000Z",
+              "image_url": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...",
+              "has_image": true
+            }
+          }
+        }
+      },
+      "errorResponses": [
+        {
+          "status": 404,
+          "body": {
+            "message": "Support record not found",
+            "data": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create Support Record",
+      "description": "Creates a new support record with comprehensive validation and support for image upload with BLOB storage",
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "{{base_url}}/api/support",
+          "host": ["{{base_url}}"],
+          "path": ["api", "support"]
+        },
+        "headers": [
+          {"key": "Accept", "value": "application/json"},
+          {"key": "Content-Type", "value": "multipart/form-data"}
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {"key": "employee_id", "value": "1", "type": "text"},
+            {"key": "message", "value": "I need help with my timesheet submission", "type": "text"},
+            {"key": "support_image", "value": "", "type": "file", "description": "Support image file (jpeg, png, jpg, gif, max 10MB)"}
+          ]
+        }
+      },
+      "response": {
+        "status": 201,
+        "body": {
+          "message": "Support record created successfully",
+          "data": {
+            "id": 1,
+            "employee_id": 1,
+            "message": "I need help with my timesheet submission",
+            "support_image_id": 1,
+            "created_at": "2024-01-15T10:30:00.000000Z",
+            "updated_at": "2024-01-15T10:30:00.000000Z",
+            "employee": {
+              "id": 1,
+              "employee_code": "EMP001",
+              "first_name": "John",
+              "last_name": "Smith",
+              "job_title": "Senior Developer"
+            },
+            "support_image": {
+              "id": 1,
+              "mime_type": "image/jpeg",
+              "size": 15360,
+              "original_name": "screenshot.jpg",
+              "created_at": "2024-01-15T10:30:00.000000Z",
+              "updated_at": "2024-01-15T10:30:00.000000Z",
+              "image_url": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...",
+              "has_image": true
+            }
+          }
+        }
+      },
+      "errorResponses": [
+        {
+          "status": 422,
+          "body": {
+            "message": "The employee id field is required.",
+            "data": []
+          }
+        },
+        {
+          "status": 422,
+          "body": {
+            "message": "The selected employee id is invalid.",
+            "data": []
+          }
+        },
+        {
+          "status": 422,
+          "body": {
+            "message": "The support image must be a file of type: jpeg, png, jpg, gif.",
+            "data": []
+          }
+        },
+        {
+          "status": 422,
+          "body": {
+            "message": "The support image may not be greater than 10240 kilobytes.",
+            "data": []
+          }
+        },
+        {
+          "status": 422,
+          "body": {
+            "message": "Invalid image data",
+            "data": []
+          }
+        },
+        {
+          "status": 500,
+          "body": {
+            "message": "Error creating support record: [error details]",
+            "data": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "Update Support Record",
+      "description": "Updates an existing support record with comprehensive validation and image upload support",
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "{{base_url}}/api/support/1",
+          "host": ["{{base_url}}"],
+          "path": ["api", "support", "1"]
+        },
+        "headers": [
+          {"key": "Accept", "value": "application/json"},
+          {"key": "Content-Type", "value": "multipart/form-data"}
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {"key": "employee_id", "value": "1", "type": "text"},
+            {"key": "message", "value": "Updated: I need help with my timesheet submission", "type": "text"},
+            {"key": "support_image", "value": "", "type": "file", "description": "Support image file (jpeg, png, jpg, gif, max 10MB)"}
+          ]
+        },
+        "pathVariables": [
+          {
+            "key": "id",
+            "value": "1",
+            "description": "The ID of the support record to update"
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "message": "Support record updated successfully",
+          "data": {
+            "id": 1,
+            "employee_id": 1,
+            "message": "Updated: I need help with my timesheet submission",
+            "support_image_id": 1,
+            "created_at": "2024-01-15T10:30:00.000000Z",
+            "updated_at": "2024-06-15T14:45:00.000000Z",
+            "employee": {
+              "id": 1,
+              "employee_code": "EMP001",
+              "first_name": "John",
+              "last_name": "Smith"
+            },
+            "support_image": {
+              "id": 1,
+              "mime_type": "image/jpeg",
+              "size": 15360,
+              "original_name": "screenshot.jpg",
+              "image_url": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...",
+              "has_image": true
+            }
+          }
+        }
+      },
+      "errorResponses": [
+        {
+          "status": 404,
+          "body": {
+            "message": "Support record not found",
+            "data": []
+          }
+        },
+        {
+          "status": 422,
+          "body": {
+            "message": "The selected employee id is invalid.",
+            "data": []
+          }
+        },
+        {
+          "status": 422,
+          "body": {
+            "message": "Invalid image data",
+            "data": []
+          }
+        },
+        {
+          "status": 500,
+          "body": {
+            "message": "Error updating support record: [error details]",
+            "data": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "Delete Support Record",
+      "description": "Deletes a support record and its associated image using cascade deletion",
+      "request": {
+        "method": "DELETE",
+        "url": {
+          "raw": "{{base_url}}/api/support/1",
+          "host": ["{{base_url}}"],
+          "path": ["api", "support", "1"]
+        },
+        "headers": [
+          {"key": "Accept", "value": "application/json"}
+        ],
+        "pathVariables": [
+          {
+            "key": "id",
+            "value": "1",
+            "description": "The ID of the support record to delete"
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "message": "Support record deleted successfully",
+          "data": []
+        }
+      },
+      "errorResponses": [
+        {
+          "status": 404,
+          "body": {
+            "message": "Support record not found",
+            "data": []
+          }
+        },
+        {
+          "status": 500,
+          "body": {
+            "message": "Error deleting support record",
+            "data": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bulk Delete Support Records",
+      "description": "Deletes multiple support records and their associated images in a single operation with transaction support",
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "{{base_url}}/api/support/bulk-delete",
+          "host": ["{{base_url}}"],
+          "path": ["api", "support", "bulk-delete"]
+        },
+        "headers": [
+          {"key": "Accept", "value": "application/json"},
+          {"key": "Content-Type", "value": "application/json"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": {
+            "ids": [1, 2, 3, 4, 5]
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "message": "5 support record(s) deleted successfully",
+          "data": []
+        }
+      },
+      "errorResponses": [
+        {
+          "status": 422,
+          "body": {
+            "message": "The ids field is required.",
+            "data": []
+          }
+        },
+        {
+          "status": 422,
+          "body": {
+            "message": "The ids must be an array.",
+            "data": []
+          }
+        },
+        {
+          "status": 500,
+          "body": {
+            "message": "Error deleting support records",
+            "data": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "Search Support Records",
+      "description": "Searches support records with formatted display text optimized for dropdowns and search components",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/api/support/search?term=help&employee_id=1",
+          "host": ["{{base_url}}"],
+          "path": ["api", "support", "search"],
+          "query": [
+            {"key": "term", "value": "help", "description": "Search term for message content"},
+            {"key": "employee_id", "value": "1", "description": "Filter by employee ID"}
+          ]
+        },
+        "headers": [
+          {"key": "Accept", "value": "application/json"}
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "message": "Support search results",
+          "data": [
+            {
+              "id": 1,
+              "employee_id": 1,
+              "message": "I need help with my timesheet submission",
+              "support_image_id": 1,
+              "created_at": "2024-01-15T10:30:00.000000Z",
+              "updated_at": "2024-01-15T10:30:00.000000Z",
+              "display_text": "I need help with my timesheet submission",
+              "employee": {
+                "id": 1,
+                "employee_code": "EMP001",
+                "first_name": "John",
+                "last_name": "Smith"
+              },
+              "support_image": {
+                "id": 1,
+                "mime_type": "image/jpeg",
+                "size": 15360,
+                "original_name": "screenshot.jpg",
+                "image_url": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...",
+                "has_image": true
+              }
+            }
+          ]
+        }
+      },
+      "errorResponses": [
+        {
+          "status": 500,
+          "body": {
+            "message": "Error searching support records: [error details]",
+            "data": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "Upload Support Image",
+      "description": "Uploads and stores support image as BLOB data with comprehensive validation, MIME type detection, and optimized data URI generation",
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "{{base_url}}/api/support/1/upload-image",
+          "host": ["{{base_url}}"],
+          "path": ["api", "support", "1", "upload-image"]
+        },
+        "headers": [
+          {"key": "Accept", "value": "application/json"},
+          {"key": "Content-Type", "value": "multipart/form-data"}
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {"key": "support_image", "value": "", "type": "file", "description": "Support image file (jpeg, png, jpg, gif, max 10MB)"}
+          ]
+        },
+        "pathVariables": [
+          {
+            "key": "id",
+            "value": "1",
+            "description": "The ID of the support record to upload image for"
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "message": "Support image uploaded successfully",
+          "data": {
+            "image_url": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...",
+            "has_image": true,
+            "image_size": 15360,
+            "mime_type": "image/jpeg",
+            "original_name": "screenshot.jpg"
+          }
+        }
+      },
+      "errorResponses": [
+        {
+          "status": 404,
+          "body": {
+            "message": "Support record not found",
+            "data": []
+          }
+        },
+        {
+          "status": 422,
+          "body": {
+            "message": "The support image field is required.",
+            "data": []
+          }
+        },
+        {
+          "status": 422,
+          "body": {
+            "message": "The support image must be a file of type: jpeg, png, jpg, gif.",
+            "data": []
+          }
+        },
+        {
+          "status": 422,
+          "body": {
+            "message": "The support image may not be greater than 10240 kilobytes.",
+            "data": []
+          }
+        },
+        {
+          "status": 422,
+          "body": {
+            "message": "Invalid image data",
+            "data": []
+          }
+        },
+        {
+          "status": 500,
+          "body": {
+            "message": "Error uploading image: [error details]",
+            "data": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Support Image",
+      "description": "Retrieves support image data with multiple format options including base64, data URI, and metadata",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/api/support/1/image",
+          "host": ["{{base_url}}"],
+          "path": ["api", "support", "1", "image"]
+        },
+        "headers": [
+          {"key": "Accept", "value": "application/json"}
+        ],
+        "pathVariables": [
+          {
+            "key": "id",
+            "value": "1",
+            "description": "The ID of the support record to get image for"
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "message": "Support image retrieved successfully",
+          "data": {
+            "image_url": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...",
+            "image_base64": "/9j/4AAQSkZJRgABAQAAAQABAAD...",
+            "image_size": 15360,
+            "mime_type": "image/jpeg",
+            "original_name": "screenshot.jpg"
+          }
+        }
+      },
+      "errorResponses": [
+        {
+          "status": 404,
+          "body": {
+            "message": "Support record not found",
+            "data": []
+          }
+        },
+        {
+          "status": 404,
+          "body": {
+            "message": "Support record has no image",
+            "data": []
+          }
+        },
+        {
+          "status": 500,
+          "body": {
+            "message": "Error retrieving image: [error details]",
+            "data": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "Delete Support Image",
+      "description": "Removes support image from the database and updates the support record",
+      "request": {
+        "method": "DELETE",
+        "url": {
+          "raw": "{{base_url}}/api/support/1/image",
+          "host": ["{{base_url}}"],
+          "path": ["api", "support", "1", "image"]
+        },
+        "headers": [
+          {"key": "Accept", "value": "application/json"}
+        ],
+        "pathVariables": [
+          {
+            "key": "id",
+            "value": "1",
+            "description": "The ID of the support record to delete image for"
+          }
+        ]
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "message": "Support image deleted successfully",
+          "data": {
+            "has_image": false
+          }
+        }
+      },
+      "errorResponses": [
+        {
+          "status": 404,
+          "body": {
+            "message": "Support record not found",
+            "data": []
+          }
+        },
+        {
+          "status": 500,
+          "body": {
+            "message": "Error deleting image: [error details]",
+            "data": []
+          }
+        }
+      ]
+    }
+  ],
+  "notes": {
+    "implemented_endpoints": [
+      "GET /api/support -> SupportController@index",
+      "GET /api/support/all -> SupportController@all",
+      "GET /api/support/{id} -> SupportController@show",
+      "POST /api/support -> SupportController@store",
+      "POST /api/support/{id} -> SupportController@update",
+      "DELETE /api/support/{id} -> SupportController@destroy",
+      "POST /api/support/bulk-delete -> SupportController@bulkDestroy",
+      "GET /api/support/search -> SupportController@search",
+      "POST /api/support/{id}/upload-image -> SupportController@uploadImage",
+      "GET /api/support/{id}/image -> SupportController@getImage",
+      "DELETE /api/support/{id}/image -> SupportController@deleteImage"
+    ],
+    "validation_rules": {
+      "employee_id": "Required, must be integer and exist in xxx_employees table",
+      "message": "Required, must be string (text field)",
+      "support_image": "Optional file upload, must be image type (jpeg, png, jpg, gif), max 10MB",
+      "image_validation": "Binary data validation using getimagesize() function"
+    },
+    "image_handling": {
+      "storage_type": "BLOB database storage in support_images table",
+      "supported_formats": ["jpeg", "png", "jpg", "gif"],
+      "max_size": "10MB (10240 KB)",
+      "validation": "Binary data validation using getimagesize()",
+      "output_formats": [
+        "image_url - Data URI with detected MIME type",
+        "image_base64 - Raw base64 encoded data"
+      ],
+      "features": [
+        "Automatic MIME type detection",
+        "Image size calculation",
+        "Binary data validation",
+        "Original filename preservation",
+        "UTF-8 encoding safe (hidden from JSON serialization)"
+      ]
+    },
+    "database_structure": {
+      "xx_support_table": {
+        "columns": [
+          "id - Primary key",
+          "employee_id - Foreign key to xxx_employees",
+          "message - Text field for support message",
+          "support_image_id - Foreign key to support_images (nullable)",
+          "created_at - Timestamp",
+          "updated_at - Timestamp"
+        ],
+        "indexes": [
+          "employee_id",
+          "support_image_id"
+        ],
+        "foreign_keys": [
+          "employee_id -> xxx_employees.id (cascade delete)",
+          "support_image_id -> support_images.id (set null on delete)"
+        ]
+      },
+      "support_images_table": {
+        "columns": [
+          "id - Primary key",
+          "image - LONGTEXT for BLOB storage",
+          "mime_type - VARCHAR(100) for MIME type",
+          "size - INTEGER for file size",
+          "original_name - VARCHAR(255) for original filename",
+          "created_at - Timestamp",
+          "updated_at - Timestamp"
+        ]
+      }
+    },
+    "relationships": {
+      "support_record": "Belongs-to relationship with Employee model (xxx_employees table)",
+      "support_image": "Belongs-to relationship with SupportImage model",
+      "employee": "Has-many relationship with XxSupport model",
+      "support_image_records": "Has-many relationship with XxSupport model"
+    },
+    "features": {
+      "pagination": "Built-in pagination for large datasets",
+      "search_functionality": "Advanced search with message content filtering",
+      "filtering": "Employee and image presence filtering support",
+      "image_management": "Complete CRUD operations for image handling",
+      "bulk_operations": "Bulk delete with transaction support",
+      "transaction_support": "Database transactions for data consistency",
+      "cascade_deletion": "Automatic cleanup of related images",
+      "validation": "Comprehensive validation with custom rules",
+      "error_handling": "Structured error responses with detailed messages"
+    },
+    "security": {
+      "image_validation": "Binary data validation to prevent malicious uploads",
+      "input_sanitization": "Laravel validation and sanitization",
+      "transaction_rollback": "Automatic rollback on errors",
+      "file_size_limits": "10MB maximum file size for uploads",
+      "mime_type_validation": "Strict MIME type validation for image uploads"
+    },
+    "performance": {
+      "blob_storage": "Efficient BLOB storage for images",
+      "indexing": "Database indexes on foreign keys",
+      "query_optimization": "Eager loading of relationships",
+      "memory_efficient": "Base64 encoding only when needed",
+      "search_limits": "Search results limited to 20 records for performance"
+    }
+  }
+}

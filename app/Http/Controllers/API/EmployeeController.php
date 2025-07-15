@@ -89,7 +89,7 @@ class EmployeeController extends Controller
             'contract_end_date'   => 'nullable|date|after_or_equal:contract_start_date',
             'user_status'         => 'nullable|in:active,inactive',
             'password'            => 'nullable|string|min:8',
-            'image_path'          => 'nullable|string|max:255',
+            'image_path'          => 'nullable|file|mimes:jpeg,png,jpg,gif|max:10240', // For file uploads
             'role_id'             => 'nullable|integer|exists:xxx_roles,id',
             /* ==== CHILD COLLECTIONS ==== */
             'phones'                    => 'sometimes|array',
@@ -157,17 +157,22 @@ class EmployeeController extends Controller
             $requestData = $request->only((new Employee)->getFillable());
             $requestData['employee_code'] = $this->generateEmployeeCode();
 
-            // Handle image upload if present
-            if ($request->hasFile('image')) {
-                $file = $request->file('image');
-                $filename = 'employee_new_' . time() . '.' . $file->getClientOriginalExtension();
-                $fileContents = file_get_contents($file->getRealPath());
-                Storage::disk('employee_photos')->put($filename, $fileContents);
-                $requestData['image_path'] = url('/storage/employee_photos/' . $filename);
+            // Handle image upload
+            if ($request->hasFile('image_path')) {
+                $file = $request->file('image_path');
+                $imageData = file_get_contents($file->getRealPath());
+
+                // Validate image data
+                if (!Employee::validateImageData($imageData)) {
+                    return $this->fail('Invalid image data', 422);
+                }
+
+                // Ensure proper UTF-8 handling by encoding as base64
+                $requestData['image_path'] = base64_encode($imageData);
             }
 
-            /* create employee */
             $emp = Employee::create($requestData);
+
 
             /* phones */
             foreach ($request->input('phones',[]) as $p) {
@@ -182,9 +187,11 @@ class EmployeeController extends Controller
 
             DB::commit();
             return $this->ok('Employee created successfully', $emp->load(['phones','emergencyContacts']),201);
-        } catch (Throwable $e) {
+        } catch (\Exception $e) {
             DB::rollBack();
-            return $this->fail('Error creating employee: ' . $e->getMessage(),500);
+            // Log the actual error for debugging
+            \Log::error('Error creating employee: ' . $e->getMessage());
+            return $this->fail('Error creating employee. Please check the data format.', 500);
         }
     }
 
@@ -200,29 +207,34 @@ class EmployeeController extends Controller
         DB::beginTransaction();
         try {
             /* update scalar cols */
-            foreach ($emp->getFillable() as $col) {
-                if ($request->filled($col)) { $emp->$col = $request->$col; }
-            }
-
-            // Handle image upload if present
-            if ($request->hasFile('image')) {
-                // Delete old image if exists
-                if ($emp->image_path) {
-                    $oldFilename = basename(parse_url($emp->image_path, PHP_URL_PATH));
-                    if (Storage::disk('employee_photos')->exists($oldFilename)) {
-                        Storage::disk('employee_photos')->delete($oldFilename);
+            $updateData = $request->only(array_diff($emp->getFillable(), ['image_path']));
+            foreach ($updateData as $key => $value) {
+                if ($request->filled($key)) {
+                    // Ensure proper UTF-8 handling for string fields
+                    if (is_string($value)) {
+                        $emp->$key = mb_convert_encoding($value, 'UTF-8', 'UTF-8');
+                    } else {
+                        $emp->$key = $value;
                     }
                 }
+            }
 
-                // Store new image
-                $file = $request->file('image');
-                $filename = 'employee_' . $id . '_' . time() . '.' . $file->getClientOriginalExtension();
-                $fileContents = file_get_contents($file->getRealPath());
-                Storage::disk('employee_photos')->put($filename, $fileContents);
-                $emp->image_path = url('/storage/employee_photos/' . $filename);
+            // Handle image upload separately
+            if ($request->hasFile('image_path')) {
+                $file = $request->file('image_path');
+                $imageData = file_get_contents($file->getRealPath());
+
+                // Validate image data
+                if (!Employee::validateImageData($imageData)) {
+                    return $this->fail('Invalid image data', 422);
+                }
+
+                // Ensure proper UTF-8 handling by encoding as base64
+                $emp->image_path = base64_encode($imageData);
             }
 
             $emp->save();
+
 
             /* ── sync phones: simple strategy → delete then re‑insert */
             EmpPhone::where('employee_id',$id)->delete();
@@ -241,9 +253,11 @@ class EmployeeController extends Controller
             DB::commit();
             return $this->ok('Employee updated successfully',
                 $emp->load(['phones','emergencyContacts']));
-        } catch (Throwable $e) {
+        } catch (\Exception $e) {
             DB::rollBack();
-            return $this->fail('Error updating employee: ' . $e->getMessage(),500);
+            // Log the actual error for debugging
+            \Log::error('Error updating employee: ' . $e->getMessage());
+            return $this->fail('Error updating employee. Please check the data format.', 500);
         }
     }
 
@@ -308,56 +322,138 @@ class EmployeeController extends Controller
         return $this->ok('Employee search results', $formattedResults);
     }
 
+    /**
+     * Return all employees without pagination (with the same filters as index).
+     */
+    public function all(Request $request): JsonResponse
+    {
+        $query = Employee::query()
+            ->select(['id', 'employee_code', 'first_name', 'last_name']);
+
+        // Apply search filters if provided
+        if ($request->has('search')) {
+            $searchTerm = '%' . $request->input('search') . '%';
+            $query->where(function($q) use ($searchTerm) {
+                $q->where('first_name', 'LIKE', $searchTerm)
+                ->orWhere('last_name', 'LIKE', $searchTerm)
+                ->orWhere('middle_name', 'LIKE', $searchTerm)
+                ->orWhere('employee_code', 'LIKE', $searchTerm)
+                ->orWhere('job_title', 'LIKE', $searchTerm)
+                ->orWhere('work_email', 'LIKE', $searchTerm)
+                ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", [$searchTerm])
+                ->orWhereRaw("CONCAT(first_name, ' ', middle_name, ' ', last_name) LIKE ?", [$searchTerm])
+                ->orWhereRaw("CONCAT(last_name, ' ', first_name) LIKE ?", [$searchTerm]);
+            });
+        }
+        $employees = $query->get();
+        return $this->ok('All employees fetched successfully', $employees);
+    }
+
+
     /* ─────────────────────  Image Upload  ───────────────────── */
+
     public function uploadImage(Request $request, int $id): JsonResponse
     {
+        // Find the employee or return 404
         $emp = Employee::find($id);
-        if (!$emp) { return $this->fail('Employee not found', 404); }
-
-        if (!$request->hasFile('image')) {
-            return $this->fail('No image provided', 422);
+        if (! $emp) {
+            return $this->fail('Employee not found', 404);
         }
 
-        $file = $request->file('image');
-
-        // Validate the file
-        $validator = Validator::make(['image' => $file], [
-            'image' => 'required|image|mimes:jpeg,png,jpg|max:2048',
-        ]);
-
+        // Validate that an image file was sent under "image"
+        $validator = Validator::make(
+            $request->all(),
+            [
+                'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:10240'
+            ]
+        );
         if ($validator->fails()) {
             return $this->fail($validator->errors()->first(), 422);
         }
 
         try {
-            // Delete old image if exists
-            if ($emp->image_path) {
-                // Extract filename from the full URL if needed
-                $oldFilename = basename(parse_url($emp->image_path, PHP_URL_PATH));
-                if (Storage::disk('employee_photos')->exists($oldFilename)) {
-                    Storage::disk('employee_photos')->delete($oldFilename);
-                }
+            // Read the uploaded file as binary data
+            $file = $request->file('image');
+            $imageData = file_get_contents($file->getRealPath());
+
+            // Validate image data
+            if (!Employee::validateImageData($imageData)) {
+                return $this->fail('Invalid image data', 422);
             }
 
-            // Generate unique filename
-            $filename = 'employee_' . $emp->id . '_' . time() . '.' . $file->getClientOriginalExtension();
+            // Ensure proper UTF-8 handling by encoding as base64
+            $base64Data = base64_encode($imageData);
 
-            // Store the file
-            $fileContents = file_get_contents($file->getRealPath());
-            Storage::disk('employee_photos')->put($filename, $fileContents);
+            // Validate the base64 encoding worked
+            if (base64_decode($base64Data, true) === false) {
+                return $this->fail('Failed to encode image data', 422);
+            }
 
-            // Generate full URL with server name
-            $fullUrl = url('/storage/employee_photos/' . $filename);
-
-            // Update employee record with full image URL
-            $emp->image_path = $fullUrl;
+            $emp->image_path = $base64Data;
             $emp->save();
 
+            // Return success with safe data
             return $this->ok('Employee image uploaded successfully', [
-                'image_path' => $fullUrl
+                'image_url' => $emp->image_url,
+                'optimized_image_url' => $emp->optimized_image_url,
+                'has_image' => $emp->hasImage(),
+                'image_size' => $emp->getImageSize(),
+                'mime_type' => $emp->getImageMimeType()
+            ]);
+        } catch (\Exception $e) {
+            // Log the actual error for debugging
+            \Log::error('Error uploading image: ' . $e->getMessage());
+            return $this->fail('Error uploading image. Please try again.', 500);
+        }
+    }
+
+    /**
+     * Get employee image
+     */
+    public function getImage(int $id): JsonResponse
+    {
+        $emp = Employee::find($id);
+        if (!$emp) {
+            return $this->fail('Employee not found', 404);
+        }
+
+        if (!$emp->hasImage()) {
+            return $this->fail('Employee has no image', 404);
+        }
+
+        try {
+            return $this->ok('Employee image retrieved successfully', [
+                'image_url' => $emp->image_url,
+                'optimized_image_url' => $emp->optimized_image_url,
+                'image_base64' => $emp->image_base64,
+                'image_size' => $emp->getImageSize(),
+                'mime_type' => $emp->getImageMimeType()
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Error retrieving image: ' . $e->getMessage());
+            return $this->fail('Error retrieving image', 500);
+        }
+    }
+
+    /**
+     * Delete employee image
+     */
+    public function deleteImage(int $id): JsonResponse
+    {
+        $emp = Employee::find($id);
+        if (!$emp) {
+            return $this->fail('Employee not found', 404);
+        }
+
+        try {
+            $emp->image_path = null;
+            $emp->save();
+
+            return $this->ok('Employee image deleted successfully', [
+                'has_image' => $emp->hasImage()
             ]);
         } catch (Throwable $e) {
-            return $this->fail('Error uploading image: ' . $e->getMessage(), 500);
+            return $this->fail('Error deleting image: ' . $e->getMessage(), 500);
         }
     }
 }
