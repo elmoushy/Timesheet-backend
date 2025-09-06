@@ -753,7 +753,7 @@ class TimeManagementController extends Controller
 
             // Log activity before deleting
             $this->logTaskActivity('project', $id, $employee->id, 'deleted');
-            
+
             // Delete the task
             $task->delete();
 
@@ -1040,7 +1040,7 @@ class TimeManagementController extends Controller
                 $analytics = EmployeeProductivityAnalytics::where('employee_id', $employeeId)
                     ->where('date', $today)
                     ->first();
-                
+
                 if ($analytics) {
                     if ($action === 'task_completed') {
                         $analytics->increment('tasks_completed');
@@ -1148,7 +1148,7 @@ class TimeManagementController extends Controller
                 $analytics = EmployeeProductivityAnalytics::where('employee_id', $employeeId)
                     ->where('date', $today)
                     ->first();
-                
+
                 if ($analytics) {
                     if ($action === 'task_completed') {
                         $analytics->increment('tasks_completed');

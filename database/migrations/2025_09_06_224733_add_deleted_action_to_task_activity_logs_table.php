@@ -15,10 +15,10 @@ return new class extends Migration
         // For SQLite, we need to recreate the table to add new enum values
         // First, backup existing data
         $existingData = DB::table('task_activity_logs')->get();
-        
+
         // Drop the table
         Schema::drop('task_activity_logs');
-        
+
         // Recreate the table with updated enum
         Schema::create('task_activity_logs', function (Blueprint $table) {
             $table->bigIncrements('id');
@@ -54,7 +54,7 @@ return new class extends Migration
             $table->index('action');
             $table->index('performed_at');
         });
-        
+
         // Restore existing data
         foreach ($existingData as $record) {
             DB::table('task_activity_logs')->insert((array) $record);
@@ -68,10 +68,10 @@ return new class extends Migration
     {
         // Backup existing data
         $existingData = DB::table('task_activity_logs')->get();
-        
+
         // Drop the table
         Schema::drop('task_activity_logs');
-        
+
         // Recreate the table with original enum (without 'deleted')
         Schema::create('task_activity_logs', function (Blueprint $table) {
             $table->bigIncrements('id');
@@ -106,7 +106,7 @@ return new class extends Migration
             $table->index('action');
             $table->index('performed_at');
         });
-        
+
         // Restore existing data (excluding 'deleted' actions)
         foreach ($existingData as $record) {
             if ($record->action !== 'deleted') {
