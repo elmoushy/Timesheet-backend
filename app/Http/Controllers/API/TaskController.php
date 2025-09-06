@@ -1,10 +1,11 @@
 <?php
+
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
-use App\Models\Task;
 use App\Models\Department;
 use App\Models\Project;
+use App\Models\Task;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -32,7 +33,7 @@ class TaskController extends Controller
                 'required',
                 'string',
                 'max:255',
-                $id > 0 ? Rule::unique('xxx_tasks', 'name')->ignore($id) : Rule::unique('xxx_tasks', 'name')
+                $id > 0 ? Rule::unique('xxx_tasks', 'name')->ignore($id) : Rule::unique('xxx_tasks', 'name'),
             ],
             'task_type' => 'required|string|max:100',
             'department_id' => 'required|integer|exists:xxx_departments,id',
@@ -48,11 +49,11 @@ class TaskController extends Controller
 
         // Apply search filters if provided
         if ($request->has('search')) {
-            $searchTerm = '%' . $request->input('search') . '%';
-            $query->where(function($q) use ($searchTerm) {
+            $searchTerm = '%'.$request->input('search').'%';
+            $query->where(function ($q) use ($searchTerm) {
                 $q->where('name', 'LIKE', $searchTerm)
-                  ->orWhere('task_type', 'LIKE', $searchTerm)
-                  ->orWhere('description', 'LIKE', $searchTerm);
+                    ->orWhere('task_type', 'LIKE', $searchTerm)
+                    ->orWhere('description', 'LIKE', $searchTerm);
             });
         }
 
@@ -81,6 +82,7 @@ class TaskController extends Controller
     {
         // Return all tasks for dropdown/select lists (no pagination)
         $tasks = Task::select('id', 'name', 'task_type', 'project_id')->orderBy('name')->get();
+
         return $this->ok('All tasks fetched successfully', $tasks);
     }
 
@@ -88,6 +90,7 @@ class TaskController extends Controller
     public function show(int $id): JsonResponse
     {
         $task = Task::with(['department', 'project'])->find($id);
+
         return $task
             ? $this->ok('Task fetched successfully', $task)
             : $this->fail('Task not found', 404);
@@ -103,12 +106,12 @@ class TaskController extends Controller
 
         try {
             $task = Task::create($request->only([
-                'name', 'task_type', 'department_id', 'project_id', 'description'
+                'name', 'task_type', 'department_id', 'project_id', 'description',
             ]));
 
             return $this->ok('Task created successfully', $task->load(['department', 'project']), 201);
         } catch (Throwable $e) {
-            return $this->fail('Error creating task: ' . $e->getMessage(), 500);
+            return $this->fail('Error creating task: '.$e->getMessage(), 500);
         }
     }
 
@@ -116,7 +119,7 @@ class TaskController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         $task = Task::find($id);
-        if (!$task) {
+        if (! $task) {
             return $this->fail('Task not found', 404);
         }
 
@@ -127,12 +130,12 @@ class TaskController extends Controller
 
         try {
             $task->update($request->only([
-                'name', 'task_type', 'department_id', 'project_id', 'description'
+                'name', 'task_type', 'department_id', 'project_id', 'description',
             ]));
 
             return $this->ok('Task updated successfully', $task->load(['department', 'project']));
         } catch (Throwable $e) {
-            return $this->fail('Error updating task: ' . $e->getMessage(), 500);
+            return $this->fail('Error updating task: '.$e->getMessage(), 500);
         }
     }
 
@@ -140,33 +143,35 @@ class TaskController extends Controller
     public function destroy(int $id): JsonResponse
     {
         $task = Task::find($id);
-        if (!$task) {
+        if (! $task) {
             return $this->fail('Task not found', 404);
         }
 
         try {
             $task->delete();
+
             return $this->ok('Task deleted successfully');
         } catch (Throwable $e) {
-            return $this->fail('Error deleting task: ' . $e->getMessage(), 500);
+            return $this->fail('Error deleting task: '.$e->getMessage(), 500);
         }
     }
 
     public function bulkDestroy(Request $request): JsonResponse
     {
         $ids = $request->input('ids', []);
-        if (!is_array($ids) || empty($ids)) {
+        if (! is_array($ids) || empty($ids)) {
             return $this->fail('ids must be a non-empty array', 422);
         }
 
         try {
             $deleted = Task::whereIn('id', $ids)->delete();
+
             return $this->ok($deleted
                 ? "$deleted task(s) deleted successfully"
                 : 'No tasks were deleted'
             );
         } catch (Throwable $e) {
-            return $this->fail('Error deleting tasks: ' . $e->getMessage(), 500);
+            return $this->fail('Error deleting tasks: '.$e->getMessage(), 500);
         }
     }
 
@@ -178,10 +183,10 @@ class TaskController extends Controller
 
         // Apply filters if provided
         if ($request->has('term')) {
-            $searchTerm = '%' . $request->input('term') . '%';
-            $query->where(function($q) use ($searchTerm) {
+            $searchTerm = '%'.$request->input('term').'%';
+            $query->where(function ($q) use ($searchTerm) {
                 $q->where('name', 'LIKE', $searchTerm)
-                  ->orWhere('task_type', 'LIKE', $searchTerm);
+                    ->orWhere('task_type', 'LIKE', $searchTerm);
             });
         }
 
@@ -204,13 +209,13 @@ class TaskController extends Controller
         $results = $query->limit(50)->get();
 
         // Format results for dropdown with display text and value
-        $formattedResults = $results->map(function($task) {
+        $formattedResults = $results->map(function ($task) {
             return [
                 'id' => $task->id,
                 'name' => $task->name,
                 'task_type' => $task->task_type,
                 'project_id' => $task->project_id,
-                'display_text' => "{$task->name} ({$task->task_type})"
+                'display_text' => "{$task->name} ({$task->task_type})",
             ];
         });
 
@@ -227,7 +232,7 @@ class TaskController extends Controller
 
         // Apply filters if provided
         if ($request->has('term')) {
-            $searchTerm = '%' . $request->input('term') . '%';
+            $searchTerm = '%'.$request->input('term').'%';
             $query->where('name', 'LIKE', $searchTerm);
         }
 
@@ -235,11 +240,11 @@ class TaskController extends Controller
         $results = $query->get();
 
         // Format results for dropdown with display text and value
-        $formattedResults = $results->map(function($department) {
+        $formattedResults = $results->map(function ($department) {
             return [
                 'id' => $department->id,
                 'name' => $department->name,
-                'display_text' => $department->name
+                'display_text' => $department->name,
             ];
         });
 
@@ -254,7 +259,7 @@ class TaskController extends Controller
         try {
             $project = Project::find($projectId);
 
-            if (!$project) {
+            if (! $project) {
                 return $this->fail('Project not found', 404);
             }
 
@@ -264,7 +269,7 @@ class TaskController extends Controller
 
             return $this->ok('Project tasks retrieved successfully', $tasks);
         } catch (Throwable $e) {
-            return $this->fail('Error retrieving project tasks: ' . $e->getMessage(), 500);
+            return $this->fail('Error retrieving project tasks: '.$e->getMessage(), 500);
         }
     }
 
@@ -276,7 +281,7 @@ class TaskController extends Controller
         try {
             $department = Department::find($departmentId);
 
-            if (!$department) {
+            if (! $department) {
                 return $this->fail('Department not found', 404);
             }
 
@@ -286,7 +291,7 @@ class TaskController extends Controller
 
             return $this->ok('Department projects retrieved successfully', $projects);
         } catch (Throwable $e) {
-            return $this->fail('Error retrieving department projects: ' . $e->getMessage(), 500);
+            return $this->fail('Error retrieving department projects: '.$e->getMessage(), 500);
         }
     }
 }

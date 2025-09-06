@@ -17,6 +17,7 @@ class Project extends Model
         'department_id',
         'start_date',
         'end_date',
+        'project_manager_id',
         'notes',
     ];
 
@@ -66,11 +67,11 @@ class Project extends Model
     }
 
     /**
-     * Get contact numbers associated with this project
+     * Get contact numbers associated with this project only (not client contact numbers)
      */
     public function contactNumbers()
     {
-        return $this->hasMany(ClientNumber::class, 'project_id');
+        return $this->hasMany(ClientNumber::class, 'project_id')->whereNotNull('project_id');
     }
 
     /**

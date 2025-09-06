@@ -9,6 +9,7 @@ class ProjectManager extends Pivot
     protected $table = 'xxx_project_managers';
 
     public $incrementing = false;
+
     protected $primaryKey = ['project_id', 'employee_id'];
 
     protected $fillable = [

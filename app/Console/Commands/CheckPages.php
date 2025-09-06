@@ -2,8 +2,8 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
 use App\Models\Page;
+use Illuminate\Console\Command;
 
 class CheckPages extends Command
 {
@@ -28,14 +28,14 @@ class CheckPages extends Command
     {
         $pages = Page::orderBy('id')->get(['id', 'name', 'is_active']);
 
-        $this->info('Total pages: ' . $pages->count());
+        $this->info('Total pages: '.$pages->count());
         $this->line('');
 
-        $this->table(['ID', 'Name', 'Active'], $pages->map(function($page) {
+        $this->table(['ID', 'Name', 'Active'], $pages->map(function ($page) {
             return [
                 $page->id,
                 $page->name,
-                $page->is_active ? 'Yes' : 'No'
+                $page->is_active ? 'Yes' : 'No',
             ];
         })->toArray());
 

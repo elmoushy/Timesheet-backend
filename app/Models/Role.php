@@ -75,9 +75,9 @@ class Role extends Model
     public function pages()
     {
         return $this->belongsToMany(Page::class, 'xxx_page_role_permissions', 'role_id', 'page_id')
-                    ->wherePivot('is_active', true)
-                    ->withPivot('is_active')
-                    ->withTimestamps();
+            ->wherePivot('is_active', true)
+            ->withPivot('is_active')
+            ->withTimestamps();
     }
 
     /**
@@ -86,8 +86,8 @@ class Role extends Model
     public function usersViaUserRoles()
     {
         return $this->belongsToMany(Employee::class, 'xxx_user_roles', 'role_id', 'user_id')
-                    ->wherePivot('is_active', true)
-                    ->withPivot('is_active', 'assigned_by')
-                    ->withTimestamps();
+            ->wherePivot('is_active', true)
+            ->withPivot('is_active', 'assigned_by')
+            ->withTimestamps();
     }
 }

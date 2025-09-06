@@ -119,7 +119,7 @@ class BulkTaskOperation extends Model
         $errors[] = [
             'task_id' => $taskId,
             'error' => $error,
-            'timestamp' => now()->toISOString()
+            'timestamp' => now()->toISOString(),
         ];
         $this->error_log = $errors;
         $this->save();
@@ -142,11 +142,12 @@ class BulkTaskOperation extends Model
      */
     public function getDuration(): ?int
     {
-        if (!$this->started_at) {
+        if (! $this->started_at) {
             return null;
         }
 
         $endTime = $this->completed_at ?? now();
+
         return $this->started_at->diffInSeconds($endTime);
     }
 

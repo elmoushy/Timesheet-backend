@@ -77,8 +77,6 @@ class Timesheet extends Model
 
     /**
      * Check if this timesheet can be edited.
-     *
-     * @return bool
      */
     public function canBeEdited(): bool
     {
@@ -87,8 +85,6 @@ class Timesheet extends Model
 
     /**
      * Check if this timesheet can be deleted.
-     *
-     * @return bool
      */
     public function canBeDeleted(): bool
     {
@@ -97,8 +93,6 @@ class Timesheet extends Model
 
     /**
      * Calculate total hours for this timesheet.
-     *
-     * @return float
      */
     public function calculateTotalHours(): float
     {

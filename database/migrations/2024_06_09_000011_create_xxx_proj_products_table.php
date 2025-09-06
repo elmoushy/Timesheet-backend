@@ -12,14 +12,14 @@ return new class extends Migration
             $table->unsignedBigInteger('project_id');
             $table->unsignedBigInteger('product_id');
 
-            $table->primary(['project_id','product_id'], 'pk_proj_prod');
+            $table->primary(['project_id', 'product_id'], 'pk_proj_prod');
 
             $table->foreign('project_id', 'fk_pp_proj')
-                  ->references('id')->on('xxx_projects')
-                  ->onDelete('cascade');
+                ->references('id')->on('xxx_projects')
+                ->onDelete('cascade');
 
             $table->foreign('product_id', 'fk_pp_prod')
-                  ->references('id')->on('xxx_products');
+                ->references('id')->on('xxx_products');
         });
     }
 

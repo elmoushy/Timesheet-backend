@@ -19,14 +19,14 @@ return new class extends Migration
             $table->timestamps();
 
             $table->foreign('timesheet_id')
-                  ->references('id')
-                  ->on('timesheets')
-                  ->onDelete('cascade');
+                ->references('id')
+                ->on('timesheets')
+                ->onDelete('cascade');
 
             $table->foreign('acted_by')
-                  ->references('id')
-                  ->on('xxx_employees')
-                  ->onDelete('cascade');
+                ->references('id')
+                ->on('xxx_employees')
+                ->onDelete('cascade');
 
             // Index for faster queries
             $table->index('timesheet_id');

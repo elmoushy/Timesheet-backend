@@ -27,16 +27,16 @@ return new class extends Migration
             $table->timestamps();
 
             $table->foreign('task_id', 'fk_assigned_task_master')
-                  ->references('id')->on('xxx_tasks')
-                  ->onDelete('cascade');
+                ->references('id')->on('xxx_tasks')
+                ->onDelete('cascade');
 
             $table->foreign('assigned_to', 'fk_assigned_task_emp')
-                  ->references('id')->on('xxx_employees')
-                  ->onDelete('cascade');
+                ->references('id')->on('xxx_employees')
+                ->onDelete('cascade');
 
             $table->foreign('assigned_by', 'fk_assigned_task_mgr')
-                  ->references('id')->on('xxx_employees')
-                  ->onDelete('cascade');
+                ->references('id')->on('xxx_employees')
+                ->onDelete('cascade');
 
             // Prevent duplicate assignments
             $table->unique(['task_id', 'assigned_to'], 'uk_task_employee');

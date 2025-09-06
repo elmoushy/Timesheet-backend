@@ -19,12 +19,12 @@ return new class extends Migration
             $table->primary(['project_id', 'employee_id'], 'pk_proj_mgr');
 
             $table->foreign('project_id', 'fk_projmgr_proj')
-                  ->references('id')->on('xxx_projects')
-                  ->onDelete('cascade');
+                ->references('id')->on('xxx_projects')
+                ->onDelete('cascade');
 
             $table->foreign('employee_id', 'fk_projmgr_emp')
-                  ->references('id')->on('xxx_employees')
-                  ->onDelete('cascade');
+                ->references('id')->on('xxx_employees')
+                ->onDelete('cascade');
         });
     }
 

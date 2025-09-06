@@ -10,8 +10,6 @@ class MemoryLimitMiddleware
     /**
      * Handle an incoming request.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \Closure  $next
      * @param  string  $limit
      * @return mixed
      */

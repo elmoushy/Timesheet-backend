@@ -16,22 +16,22 @@ return new class extends Migration
             $table->enum('sender_role', ['employee', 'pm', 'dm', 'gm', 'admin']);
             $table->text('message');
             $table->timestamps();
-            
+
             $table->foreign('timesheet_id')
-                  ->references('id')
-                  ->on('timesheets')
-                  ->onDelete('cascade');
-                  
+                ->references('id')
+                ->on('timesheets')
+                ->onDelete('cascade');
+
             $table->foreign('parent_id')
-                  ->references('id')
-                  ->on('timesheet_chats')
-                  ->onDelete('cascade');
-                  
+                ->references('id')
+                ->on('timesheet_chats')
+                ->onDelete('cascade');
+
             $table->foreign('sender_id')
-                  ->references('id')
-                  ->on('xxx_employees')
-                  ->onDelete('cascade');
-                  
+                ->references('id')
+                ->on('xxx_employees')
+                ->onDelete('cascade');
+
             // Index for faster queries
             $table->index('timesheet_id');
             $table->index('parent_id');

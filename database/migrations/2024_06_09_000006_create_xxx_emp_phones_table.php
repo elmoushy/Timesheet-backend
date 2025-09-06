@@ -11,14 +11,14 @@ return new class extends Migration
         Schema::create('xxx_emp_phones', function (Blueprint $table) {
             $table->bigIncrements('id');
             $table->unsignedBigInteger('employee_id');
-            $table->enum('phone_type', ['mobile','home','work','other']);
+            $table->enum('phone_type', ['mobile', 'home', 'work', 'other']);
             $table->string('phone_number', 30);
             $table->timestamps();
 
             $table->index('phone_number', 'idx_emp_phone_num');
             $table->foreign('employee_id', 'fk_ep_emp')
-                  ->references('id')->on('xxx_employees')
-                  ->onDelete('cascade');
+                ->references('id')->on('xxx_employees')
+                ->onDelete('cascade');
         });
     }
 

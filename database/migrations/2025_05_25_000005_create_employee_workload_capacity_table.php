@@ -8,6 +8,9 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Drop table if it exists to avoid conflicts
+        Schema::dropIfExists('employee_workload_capacity');
+
         Schema::create('employee_workload_capacity', function (Blueprint $table) {
             $table->bigIncrements('id');
             $table->unsignedBigInteger('employee_id');
@@ -19,14 +22,13 @@ return new class extends Migration
             $table->timestamps();
 
             $table->foreign('employee_id', 'fk_workload_emp')
-                  ->references('id')->on('xxx_employees')
-                  ->onDelete('cascade');
+                ->references('id')->on('xxx_employees')
+                ->onDelete('cascade');
 
             // Unique constraint per employee per week
             $table->unique(['employee_id', 'week_start_date'], 'uk_employee_workload_week');
 
             // Indexes
-            $table->index(['employee_id', 'week_start_date']);
             $table->index('workload_status');
             $table->index('week_start_date');
         });

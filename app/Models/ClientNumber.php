@@ -17,7 +17,7 @@ class ClientNumber extends Model
         'name',
         'number',
         'type',
-        'is_primary'
+        'is_primary',
     ];
 
     protected $casts = [

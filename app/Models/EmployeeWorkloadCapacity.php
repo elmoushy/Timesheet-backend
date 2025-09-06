@@ -43,6 +43,7 @@ class EmployeeWorkloadCapacity extends Model
     public function scopeCurrentWeek($query)
     {
         $startOfWeek = now()->startOfWeek();
+
         return $query->where('week_start_date', $startOfWeek);
     }
 

@@ -125,7 +125,8 @@ class ProjectTask extends Model
      */
     public function toggleImportant(): bool
     {
-        $this->is_important = !$this->is_important;
+        $this->is_important = ! $this->is_important;
+
         return $this->save();
     }
 
@@ -134,7 +135,8 @@ class ProjectTask extends Model
      */
     public function togglePinned(): bool
     {
-        $this->is_pinned = !$this->is_pinned;
+        $this->is_pinned = ! $this->is_pinned;
+
         return $this->save();
     }
 }

@@ -1,25 +1,24 @@
 <?php
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\API\EmployeeController;
-use App\Http\Controllers\API\SupportController;
-use App\Http\Controllers\API\DepartmentController;
-use App\Http\Controllers\API\ClientController;
 use App\Http\Controllers\API\ApplicationController;
-use App\Http\Controllers\API\TaskController;
-use App\Http\Controllers\API\ProjectController;
 use App\Http\Controllers\API\AuthController;
-use App\Http\Controllers\API\TimesheetController;
-use App\Http\Controllers\API\ProjectAssignEmployeeController;
-use App\Http\Controllers\API\TimeManagementController;
+use App\Http\Controllers\API\ClientController;
+use App\Http\Controllers\API\DepartmentController;
 use App\Http\Controllers\API\DepartmentManagerController;
+use App\Http\Controllers\API\EmployeeController;
 use App\Http\Controllers\API\PageController;
-use App\Http\Controllers\API\RoleController;
-use App\Http\Controllers\API\UserRoleController;
 use App\Http\Controllers\API\PageRolePermissionController;
+use App\Http\Controllers\API\ProjectAssignEmployeeController;
+use App\Http\Controllers\API\ProjectController;
+use App\Http\Controllers\API\RoleController;
+use App\Http\Controllers\Api\SsoController;
+use App\Http\Controllers\API\SupportController;
+use App\Http\Controllers\API\TaskController;
 use App\Http\Controllers\API\TestController;
-
+use App\Http\Controllers\API\TimeManagementController;
+use App\Http\Controllers\API\TimesheetController;
+use App\Http\Controllers\API\UserRoleController;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -32,14 +31,22 @@ use App\Http\Controllers\API\TestController;
 |
 */
 
-// Employee routes - publicly accessible
-Route::prefix('employees')->group(function () {
-    Route::get('/all', [EmployeeController::class, 'all'])
-     ->middleware('auth:sanctum');
+// SSO Authentication routes - publicly accessible
+Route::prefix('auth/sso')->group(function () {
+    Route::post('/exchange', [SsoController::class, 'exchange']);
+    Route::post('/refresh', [SsoController::class, 'refresh']);
+    Route::post('/logout', [SsoController::class, 'logout']);
+    Route::get('/me', [SsoController::class, 'me'])->middleware('jwt.auth');
+});
+
+// Employee routes - all require authentication
+Route::prefix('employees')->middleware('jwt.auth')->group(function () {
+    Route::get('/all', [EmployeeController::class, 'all']);
     Route::get('/', [EmployeeController::class, 'index']);
     Route::get('/search', [EmployeeController::class, 'search']); // New route for dropdown search
     Route::get('/{id}', [EmployeeController::class, 'show'])
-         ->whereNumber('id');    Route::post('/', [EmployeeController::class, 'store']);
+        ->whereNumber('id');
+    Route::post('/', [EmployeeController::class, 'store']);
     Route::post('/{id}', [EmployeeController::class, 'update']);
     Route::delete('/{id}', [EmployeeController::class, 'destroy']);
     Route::post('/bulk-delete', [EmployeeController::class, 'bulkDestroy']);
@@ -48,28 +55,24 @@ Route::prefix('employees')->group(function () {
     Route::delete('/{id}/image', [EmployeeController::class, 'deleteImage']); // Delete employee image
 });
 
-// Support routes - publicly accessible
-Route::prefix('support')->group(function () {
+// Support routes - all require authentication
+Route::prefix('support')->middleware('jwt.auth')->group(function () {
     Route::get('/', [SupportController::class, 'index']);
     Route::get('/all', [SupportController::class, 'all']);
     Route::get('/search', [SupportController::class, 'search']);
     Route::get('/{id}', [SupportController::class, 'show'])
-         ->whereNumber('id');
+        ->whereNumber('id');
     Route::get('/{id}/image', [SupportController::class, 'getImage']);
-
-    // Authenticated routes
-    Route::middleware('auth:sanctum')->group(function () {
-        Route::post('/', [SupportController::class, 'store']);
-        Route::post('/{id}', [SupportController::class, 'update']);
-        Route::delete('/{id}', [SupportController::class, 'destroy']);
-        Route::post('/bulk-delete', [SupportController::class, 'bulkDestroy']);
-        Route::post('/{id}/upload-image', [SupportController::class, 'uploadImage']);
-        Route::delete('/{id}/image', [SupportController::class, 'deleteImage']);
-    });
+    Route::post('/', [SupportController::class, 'store']);
+    Route::post('/{id}', [SupportController::class, 'update']);
+    Route::delete('/{id}', [SupportController::class, 'destroy']);
+    Route::post('/bulk-delete', [SupportController::class, 'bulkDestroy']);
+    Route::post('/{id}/upload-image', [SupportController::class, 'uploadImage']);
+    Route::delete('/{id}/image', [SupportController::class, 'deleteImage']);
 });
 
-// Department routes
-Route::prefix('departments')->group(function () {
+// Department routes - all require authentication
+Route::prefix('departments')->middleware('jwt.auth')->group(function () {
     Route::get('/', [DepartmentController::class, 'index']);
     Route::get('/search', [DepartmentController::class, 'search']); // New route for dropdown search
     Route::get('/{id}', [DepartmentController::class, 'show']);
@@ -86,8 +89,8 @@ Route::prefix('departments')->group(function () {
     Route::get('/employees/{employeeId}/assigned-tasks', [DepartmentController::class, 'getEmployeeAssignedTasks']);
 });
 
-// Client routes
-Route::prefix('clients')->group(function () {
+// Client routes - all require authentication
+Route::prefix('clients')->middleware('jwt.auth')->group(function () {
     Route::get('/', [ClientController::class, 'index']);
     Route::get('/list', [ClientController::class, 'list']);
     Route::get('/{id}', [ClientController::class, 'show']);
@@ -98,8 +101,8 @@ Route::prefix('clients')->group(function () {
     Route::delete('/contact-numbers/{id}', [ClientController::class, 'destroyClientNumber']);
 });
 
-// Application routes
-Route::prefix('applications')->group(function () {
+// Application routes - all require authentication
+Route::prefix('applications')->middleware('jwt.auth')->group(function () {
     Route::get('/', [ApplicationController::class, 'index']);
     Route::get('/list', [ApplicationController::class, 'list']);
     Route::get('/search', [ApplicationController::class, 'search']);
@@ -112,53 +115,57 @@ Route::prefix('applications')->group(function () {
 });
 
 /**
- * Task Routes
+ * Task Routes - all require authentication
  */
-Route::prefix('tasks')->group(function () {
+Route::prefix('tasks')->middleware('jwt.auth')->group(function () {
     Route::get('/', [TaskController::class, 'index']);
     Route::get('/list', [TaskController::class, 'list']);
     Route::get('/search', [TaskController::class, 'search']);
     Route::get('/departments', [TaskController::class, 'departmentList']);
     Route::get('/{id}', [TaskController::class, 'show']);
-    Route::post('/', [TaskController::class, 'store']);
-    Route::put('/{id}', [TaskController::class, 'update']);
-    Route::delete('/{id}', [TaskController::class, 'destroy']);
-    Route::post('/bulk-delete', [TaskController::class, 'bulkDestroy']);
 
     // New route to get tasks by project
     Route::get('/project/{projectId}', [TaskController::class, 'getTasksByProject']);
 
     // New route to get projects by department
     Route::get('/departments/{departmentId}/projects', [TaskController::class, 'getProjectsByDepartment']);
+
+    Route::post('/', [TaskController::class, 'store']);
+    Route::put('/{id}', [TaskController::class, 'update']);
+    Route::delete('/{id}', [TaskController::class, 'destroy']);
+    Route::post('/bulk-delete', [TaskController::class, 'bulkDestroy']);
 });
 
 /**
- * Project Routes
+ * Project Routes - all require authentication
  */
-Route::prefix('projects')->group(function () {
+Route::prefix('projects')->middleware('jwt.auth')->group(function () {
     Route::get('/', [ProjectController::class, 'index']);
 
     // Specific named routes must come before parameter routes
     Route::get('/clientdropdown', [ClientController::class, 'list']);
     Route::get('/pending-assignment-requests', [ProjectController::class, 'getPendingRequests']);
 
-    Route::delete('/contact-numbers/{id}', [ClientController::class, 'destroyClientNumber']);
     Route::get('/employeedropdown', [EmployeeController::class, 'search']);
-
     Route::get('/departments', [ApplicationController::class, 'departmentList']);
-    Route::post('/bulk-delete', [ProjectController::class, 'bulkDestroy']);
 
-    // Project employee assignment routes
-    Route::post('/{id}/assign-employee', [ProjectController::class, 'assignEmployee'])->middleware('auth:sanctum');
-    Route::put('/{projectId}/assignments/{assignmentId}', [ProjectController::class, 'updateAssignment']);
     Route::get('/{id}/assignments', [ProjectController::class, 'getAssignments']);
     Route::get('/{id}/employees-approval-status', [ProjectController::class, 'getEmployeesForProject']);
 
     // New route to get tasks for a project
     Route::get('/{id}/tasks', [ProjectController::class, 'getProjectTasks']);
 
-    // Basic CRUD routes with parameters - these should come last
+    // Basic read routes
     Route::get('/{id}', [ProjectController::class, 'show']);
+
+    Route::delete('/contact-numbers/{id}', [ClientController::class, 'destroyClientNumber']);
+    Route::post('/bulk-delete', [ProjectController::class, 'bulkDestroy']);
+
+    // Project employee assignment routes
+    Route::post('/{id}/assign-employee', [ProjectController::class, 'assignEmployee']);
+    Route::put('/{projectId}/assignments/{assignmentId}', [ProjectController::class, 'updateAssignment']);
+
+    // Basic CRUD routes
     Route::post('/', [ProjectController::class, 'store']);
     Route::put('/{id}', [ProjectController::class, 'update']);
     Route::delete('/{id}', [ProjectController::class, 'destroy']);
@@ -168,12 +175,11 @@ Route::prefix('projects')->group(function () {
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/change-password', [AuthController::class, 'changePassword']);
 
-// Protected routes - require authentication
-Route::middleware('auth:sanctum')->group(function () {
+// Protected routes - require JWT authentication
+Route::middleware('jwt.auth')->group(function () {
     // Auth verification
     Route::get('/check-token', [AuthController::class, 'checkToken']);
     Route::post('/logout', [AuthController::class, 'logout']);
-
 
     // Get projects assigned to authenticated user (no pagination)
     Route::get('/my-assigned-projects', [ProjectController::class, 'getMyAssignedProjects']);
@@ -257,6 +263,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/', [TimeManagementController::class, 'getProjectTasks']);
             Route::post('/', [TimeManagementController::class, 'storeProjectTask']);
             Route::put('/{id}', [TimeManagementController::class, 'updateProjectTask']);
+            Route::delete('/{id}', [TimeManagementController::class, 'deleteProjectTask']);
             Route::put('/{id}/status', [TimeManagementController::class, 'updateProjectTaskStatus']);
             Route::post('/{id}/time-spent', [TimeManagementController::class, 'logTimeSpent']);
         });
@@ -264,8 +271,10 @@ Route::middleware('auth:sanctum')->group(function () {
         // Assigned tasks from managers
         Route::prefix('assigned-tasks')->group(function () {
             Route::get('/', [TimeManagementController::class, 'getAssignedTasks']);
+            Route::put('/{id}', [TimeManagementController::class, 'updateAssignedTask']);
             Route::put('/{id}/status', [TimeManagementController::class, 'updateAssignedTaskStatus']);
             Route::post('/{id}/feedback', [TimeManagementController::class, 'submitTaskFeedback']);
+            Route::post('/{id}/time-spent', [TimeManagementController::class, 'logAssignedTaskTimeSpent']);
         });
     });
 
@@ -326,8 +335,8 @@ Route::middleware('auth:sanctum')->group(function () {
 // Permission Management Routes
 // =====================================
 
-// Pages routes
-Route::prefix('pages')->group(function () {
+// Pages routes - all require authentication
+Route::prefix('pages')->middleware('jwt.auth')->group(function () {
     Route::get('/', [PageController::class, 'index']);
     Route::get('/{id}', [PageController::class, 'show']);
     Route::post('/', [PageController::class, 'store']);
@@ -336,24 +345,30 @@ Route::prefix('pages')->group(function () {
     Route::patch('/{id}/toggle-status', [PageController::class, 'toggleStatus']);
 });
 
-// Roles routes (enhanced)
-Route::prefix('roles')->group(function () {
+// Roles routes (enhanced) - all require authentication
+Route::prefix('roles')->middleware('jwt.auth')->group(function () {
     Route::get('/', [RoleController::class, 'index']);
     Route::get('/{id}', [RoleController::class, 'show']);
-    Route::post('/', [RoleController::class, 'store']);
-    Route::put('/{id}', [RoleController::class, 'update']);
-    Route::delete('/{id}', [RoleController::class, 'destroy']);
-    Route::patch('/{id}/toggle-status', [RoleController::class, 'toggleStatus']);
 
     // Role relationships
     Route::get('/{id}/users', [RoleController::class, 'getUsers']);
     Route::get('/{id}/pages', [RoleController::class, 'getPages']);
+
+    Route::post('/', [RoleController::class, 'store']);
+    Route::put('/{id}', [RoleController::class, 'update']);
+    Route::delete('/{id}', [RoleController::class, 'destroy']);
+    Route::patch('/{id}/toggle-status', [RoleController::class, 'toggleStatus']);
 });
 
-// User Roles routes
-Route::prefix('user-roles')->group(function () {
+// User Roles routes - all require authentication
+Route::prefix('user-roles')->middleware('jwt.auth')->group(function () {
     Route::get('/', [UserRoleController::class, 'index']);
     Route::get('/{id}', [UserRoleController::class, 'show']);
+
+    // User and role specific endpoints
+    Route::get('/users/{userId}', [UserRoleController::class, 'getUserRoles']);
+    Route::get('/roles/{roleId}', [UserRoleController::class, 'getRoleUsers']);
+
     Route::post('/', [UserRoleController::class, 'store']);
     Route::put('/{id}', [UserRoleController::class, 'update']);
     Route::delete('/{id}', [UserRoleController::class, 'destroy']);
@@ -361,14 +376,10 @@ Route::prefix('user-roles')->group(function () {
 
     // Bulk operations
     Route::post('/bulk-assign', [UserRoleController::class, 'bulkAssignToUser']);
-
-    // User and role specific endpoints
-    Route::get('/users/{userId}', [UserRoleController::class, 'getUserRoles']);
-    Route::get('/roles/{roleId}', [UserRoleController::class, 'getRoleUsers']);
 });
 
 // Page Role Permissions routes
-Route::prefix('page-role-permissions')->group(function () {
+Route::prefix('page-role-permissions')->middleware('jwt.auth')->group(function () {
     Route::get('/', [PageRolePermissionController::class, 'index']);
     Route::get('/{id}', [PageRolePermissionController::class, 'show']);
     Route::post('/', [PageRolePermissionController::class, 'store']);
@@ -387,12 +398,17 @@ Route::prefix('page-role-permissions')->group(function () {
     Route::get('/matrix', [PageRolePermissionController::class, 'getPermissionMatrix']);
 });
 
+// Bulk operations - require authentication
+Route::prefix('page-role-permissions')->middleware('jwt.auth')->group(function () {
+    Route::post('/bulk-store', [PageRolePermissionController::class, 'bulkStore']);
+    Route::post('/bulk-delete', [PageRolePermissionController::class, 'bulkDelete']);
+});
+
 // =====================================
-// Test Routes for Debugging
+// Test Routes for Debugging - require authentication
 // =====================================
-Route::prefix('test')->group(function () {
+Route::prefix('test')->middleware('jwt.auth')->group(function () {
     Route::get('/utf8', [TestController::class, 'testUtf8']);
     Route::get('/binary', [TestController::class, 'testBinary']);
     Route::get('/memory', [TestController::class, 'testMemory']);
 });
-

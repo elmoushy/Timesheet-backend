@@ -17,19 +17,19 @@ return new class extends Migration
             $table->timestamp('acted_at')->nullable();
             $table->text('comment')->nullable();
             $table->timestamps();
-            
+
             $table->unique(['timesheet_id', 'approver_id']);
-            
+
             $table->foreign('timesheet_id')
-                  ->references('id')
-                  ->on('timesheets')
-                  ->onDelete('cascade');
-                  
+                ->references('id')
+                ->on('timesheets')
+                ->onDelete('cascade');
+
             $table->foreign('approver_id')
-                  ->references('id')
-                  ->on('xxx_employees')
-                  ->onDelete('cascade');
-                  
+                ->references('id')
+                ->on('xxx_employees')
+                ->onDelete('cascade');
+
             // Index for faster queries
             $table->index('timesheet_id');
             $table->index('approver_id');

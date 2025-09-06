@@ -56,6 +56,7 @@ class EmployeeProductivityAnalytics extends Model
     {
         $startOfWeek = now()->startOfWeek();
         $endOfWeek = now()->endOfWeek();
+
         return $query->whereBetween('date', [$startOfWeek, $endOfWeek]);
     }
 
@@ -65,7 +66,7 @@ class EmployeeProductivityAnalytics extends Model
     public function scopeCurrentMonth($query)
     {
         return $query->whereMonth('date', now()->month)
-                    ->whereYear('date', now()->year);
+            ->whereYear('date', now()->year);
     }
 
     /**

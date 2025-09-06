@@ -51,8 +51,6 @@ class TimesheetApproval extends Model
 
     /**
      * Check if this approval is pending.
-     *
-     * @return bool
      */
     public function isPending(): bool
     {
@@ -61,8 +59,6 @@ class TimesheetApproval extends Model
 
     /**
      * Check if this approval is approved.
-     *
-     * @return bool
      */
     public function isApproved(): bool
     {
@@ -71,8 +67,6 @@ class TimesheetApproval extends Model
 
     /**
      * Check if this approval is rejected.
-     *
-     * @return bool
      */
     public function isRejected(): bool
     {
@@ -81,29 +75,25 @@ class TimesheetApproval extends Model
 
     /**
      * Approve this timesheet approval.
-     *
-     * @param string|null $comment
-     * @return bool
      */
     public function approve(?string $comment = null): bool
     {
         $this->status = 'approved';
         $this->acted_at = now();
         $this->comment = $comment;
+
         return $this->save();
     }
 
     /**
      * Reject this timesheet approval.
-     *
-     * @param string $comment
-     * @return bool
      */
     public function reject(string $comment): bool
     {
         $this->status = 'rejected';
         $this->acted_at = now();
         $this->comment = $comment;
+
         return $this->save();
     }
 }

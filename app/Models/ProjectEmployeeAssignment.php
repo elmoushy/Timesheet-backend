@@ -130,7 +130,7 @@ class ProjectEmployeeAssignment extends Model
         return ProjectTask::create([
             'employee_id' => $this->employee_id,
             'project_assignment_id' => $this->id,
-            'title' => 'Work on ' . $this->project->project_name,
+            'title' => 'Work on '.$this->project->project_name,
             'description' => 'Auto-generated task for project assignment',
             'status' => 'to-do',
             'auto_generated' => true,

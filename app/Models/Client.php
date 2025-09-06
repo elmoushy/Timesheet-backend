@@ -27,6 +27,6 @@ class Client extends Model
 
     public function contactNumbers()
     {
-        return $this->hasMany(ClientNumber::class, 'client_id');
+        return $this->hasMany(ClientNumber::class, 'client_id')->whereNull('project_id');
     }
 }

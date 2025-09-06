@@ -60,7 +60,7 @@ class XxSupport extends Model
     public function supportImageWithData()
     {
         return $this->belongsTo(SupportImage::class, 'support_image_id')
-                   ->select('*');
+            ->select('*');
     }
 
     /**

@@ -3,13 +3,13 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
-use App\Models\UserRole;
-use App\Models\Role;
 use App\Models\Employee;
-use Illuminate\Http\Request;
+use App\Models\Role;
+use App\Models\UserRole;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 
 class UserRoleController extends Controller
 {
@@ -39,9 +39,9 @@ class UserRoleController extends Controller
             // Search by user name if specified
             if ($request->has('search')) {
                 $query->whereHas('user', function ($q) use ($request) {
-                    $q->where('first_name', 'like', '%' . $request->search . '%')
-                      ->orWhere('last_name', 'like', '%' . $request->search . '%')
-                      ->orWhere('work_email', 'like', '%' . $request->search . '%');
+                    $q->where('first_name', 'like', '%'.$request->search.'%')
+                        ->orWhere('last_name', 'like', '%'.$request->search.'%')
+                        ->orWhere('work_email', 'like', '%'.$request->search.'%');
                 });
             }
 
@@ -50,12 +50,12 @@ class UserRoleController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => $userRoles,
-                'message' => 'User roles retrieved successfully'
+                'message' => 'User roles retrieved successfully',
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error retrieving user roles: ' . $e->getMessage()
+                'message' => 'Error retrieving user roles: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -70,23 +70,23 @@ class UserRoleController extends Controller
                 'role_id' => 'required|exists:xxx_roles,id',
                 'user_id' => 'required|exists:xxx_employees,id',
                 'is_active' => 'boolean',
-                'assigned_by' => 'nullable|exists:xxx_employees,id'
+                'assigned_by' => 'nullable|exists:xxx_employees,id',
             ]);
 
             // Check if the combination already exists
             $existingUserRole = UserRole::where('role_id', $validatedData['role_id'])
-                                      ->where('user_id', $validatedData['user_id'])
-                                      ->first();
+                ->where('user_id', $validatedData['user_id'])
+                ->first();
 
             if ($existingUserRole) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'User role assignment already exists'
+                    'message' => 'User role assignment already exists',
                 ], 422);
             }
 
             // Set assigned_by to current authenticated user if not provided
-            if (!isset($validatedData['assigned_by']) && Auth::check()) {
+            if (! isset($validatedData['assigned_by']) && Auth::check()) {
                 $validatedData['assigned_by'] = Auth::id();
             }
 
@@ -96,18 +96,18 @@ class UserRoleController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => $userRole,
-                'message' => 'User role assigned successfully'
+                'message' => 'User role assigned successfully',
             ], 201);
         } catch (ValidationException $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
-                'errors' => $e->errors()
+                'errors' => $e->errors(),
             ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error assigning user role: ' . $e->getMessage()
+                'message' => 'Error assigning user role: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -120,22 +120,22 @@ class UserRoleController extends Controller
         try {
             $userRole = UserRole::with(['user', 'role', 'assignedBy'])->find($id);
 
-            if (!$userRole) {
+            if (! $userRole) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'User role not found'
+                    'message' => 'User role not found',
                 ], 404);
             }
 
             return response()->json([
                 'success' => true,
                 'data' => $userRole,
-                'message' => 'User role retrieved successfully'
+                'message' => 'User role retrieved successfully',
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error retrieving user role: ' . $e->getMessage()
+                'message' => 'Error retrieving user role: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -148,10 +148,10 @@ class UserRoleController extends Controller
         try {
             $userRole = UserRole::find($id);
 
-            if (!$userRole) {
+            if (! $userRole) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'User role not found'
+                    'message' => 'User role not found',
                 ], 404);
             }
 
@@ -159,7 +159,7 @@ class UserRoleController extends Controller
                 'role_id' => 'sometimes|required|exists:xxx_roles,id',
                 'user_id' => 'sometimes|required|exists:xxx_employees,id',
                 'is_active' => 'sometimes|boolean',
-                'assigned_by' => 'sometimes|nullable|exists:xxx_employees,id'
+                'assigned_by' => 'sometimes|nullable|exists:xxx_employees,id',
             ]);
 
             // Check if the new combination already exists (excluding current record)
@@ -168,14 +168,14 @@ class UserRoleController extends Controller
                 $userId = $validatedData['user_id'] ?? $userRole->user_id;
 
                 $existingUserRole = UserRole::where('role_id', $roleId)
-                                          ->where('user_id', $userId)
-                                          ->where('user_roles_id', '!=', $id)
-                                          ->first();
+                    ->where('user_id', $userId)
+                    ->where('user_roles_id', '!=', $id)
+                    ->first();
 
                 if ($existingUserRole) {
                     return response()->json([
                         'success' => false,
-                        'message' => 'User role assignment already exists'
+                        'message' => 'User role assignment already exists',
                     ], 422);
                 }
             }
@@ -186,18 +186,18 @@ class UserRoleController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => $userRole,
-                'message' => 'User role updated successfully'
+                'message' => 'User role updated successfully',
             ]);
         } catch (ValidationException $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
-                'errors' => $e->errors()
+                'errors' => $e->errors(),
             ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error updating user role: ' . $e->getMessage()
+                'message' => 'Error updating user role: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -210,10 +210,10 @@ class UserRoleController extends Controller
         try {
             $userRole = UserRole::find($id);
 
-            if (!$userRole) {
+            if (! $userRole) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'User role not found'
+                    'message' => 'User role not found',
                 ], 404);
             }
 
@@ -221,12 +221,12 @@ class UserRoleController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'User role assignment removed successfully'
+                'message' => 'User role assignment removed successfully',
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error removing user role: ' . $e->getMessage()
+                'message' => 'Error removing user role: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -239,25 +239,25 @@ class UserRoleController extends Controller
         try {
             $userRole = UserRole::find($id);
 
-            if (!$userRole) {
+            if (! $userRole) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'User role not found'
+                    'message' => 'User role not found',
                 ], 404);
             }
 
-            $userRole->update(['is_active' => !$userRole->is_active]);
+            $userRole->update(['is_active' => ! $userRole->is_active]);
             $userRole->load(['user', 'role', 'assignedBy']);
 
             return response()->json([
                 'success' => true,
                 'data' => $userRole,
-                'message' => 'User role status updated successfully'
+                'message' => 'User role status updated successfully',
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error updating user role status: ' . $e->getMessage()
+                'message' => 'Error updating user role status: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -272,7 +272,7 @@ class UserRoleController extends Controller
                 'user_id' => 'required|exists:xxx_employees,id',
                 'role_ids' => 'required|array',
                 'role_ids.*' => 'exists:xxx_roles,id',
-                'assigned_by' => 'nullable|exists:xxx_employees,id'
+                'assigned_by' => 'nullable|exists:xxx_employees,id',
             ]);
 
             $assignedBy = $validatedData['assigned_by'] ?? (Auth::check() ? Auth::id() : null);
@@ -281,15 +281,15 @@ class UserRoleController extends Controller
             foreach ($validatedData['role_ids'] as $roleId) {
                 // Check if assignment already exists
                 $existing = UserRole::where('user_id', $validatedData['user_id'])
-                                  ->where('role_id', $roleId)
-                                  ->first();
+                    ->where('role_id', $roleId)
+                    ->first();
 
-                if (!$existing) {
+                if (! $existing) {
                     $userRoles[] = UserRole::create([
                         'user_id' => $validatedData['user_id'],
                         'role_id' => $roleId,
                         'assigned_by' => $assignedBy,
-                        'is_active' => true
+                        'is_active' => true,
                     ]);
                 }
             }
@@ -297,18 +297,18 @@ class UserRoleController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => $userRoles,
-                'message' => count($userRoles) . ' roles assigned successfully'
+                'message' => count($userRoles).' roles assigned successfully',
             ], 201);
         } catch (ValidationException $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
-                'errors' => $e->errors()
+                'errors' => $e->errors(),
             ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error bulk assigning roles: ' . $e->getMessage()
+                'message' => 'Error bulk assigning roles: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -321,27 +321,27 @@ class UserRoleController extends Controller
         try {
             $user = Employee::find($userId);
 
-            if (!$user) {
+            if (! $user) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'User not found'
+                    'message' => 'User not found',
                 ], 404);
             }
 
             $userRoles = UserRole::with(['role', 'assignedBy'])
-                               ->where('user_id', $userId)
-                               ->orderBy('created_at', 'desc')
-                               ->get();
+                ->where('user_id', $userId)
+                ->orderBy('created_at', 'desc')
+                ->get();
 
             return response()->json([
                 'success' => true,
                 'data' => $userRoles,
-                'message' => 'User roles retrieved successfully'
+                'message' => 'User roles retrieved successfully',
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error retrieving user roles: ' . $e->getMessage()
+                'message' => 'Error retrieving user roles: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -354,27 +354,27 @@ class UserRoleController extends Controller
         try {
             $role = Role::find($roleId);
 
-            if (!$role) {
+            if (! $role) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Role not found'
+                    'message' => 'Role not found',
                 ], 404);
             }
 
             $userRoles = UserRole::with(['user', 'assignedBy'])
-                               ->where('role_id', $roleId)
-                               ->orderBy('created_at', 'desc')
-                               ->get();
+                ->where('role_id', $roleId)
+                ->orderBy('created_at', 'desc')
+                ->get();
 
             return response()->json([
                 'success' => true,
                 'data' => $userRoles,
-                'message' => 'Role users retrieved successfully'
+                'message' => 'Role users retrieved successfully',
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error retrieving role users: ' . $e->getMessage()
+                'message' => 'Error retrieving role users: '.$e->getMessage(),
             ], 500);
         }
     }

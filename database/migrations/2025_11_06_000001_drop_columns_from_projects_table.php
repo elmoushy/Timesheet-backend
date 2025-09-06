@@ -22,7 +22,7 @@ class DropColumnsFromProjectsTable extends Migration
                 'oracle_contact_name',
                 'oracle_contact_number',
                 'private_contact_name',
-                'private_contact_number'
+                'private_contact_number',
             ]);
         });
     }

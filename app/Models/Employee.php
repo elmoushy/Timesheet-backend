@@ -5,12 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Support\Facades\Hash;
+use Laravel\Sanctum\HasApiTokens;
 
 class Employee extends Authenticatable
 {
-    use HasFactory, HasApiTokens, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable;
 
     protected $table = 'xxx_employees';
 
@@ -105,13 +105,14 @@ class Employee extends Authenticatable
             // If it's binary data, encode it
             return base64_encode($data);
         }
+
         return null;
     }
 
     /**
      * Set the image from base64 string.
      *
-     * @param string|null $value
+     * @param  string|null  $value
      * @return void
      */
     public function setImageBase64Attribute($value)
@@ -140,6 +141,7 @@ class Employee extends Authenticatable
                 $base64Data = $this->getImageBase64Attribute();
                 if ($base64Data) {
                     $mimeType = $this->getImageMimeType() ?: 'image/jpeg';
+
                     return "data:{$mimeType};base64,{$base64Data}";
                 }
             } catch (\Exception $e) {
@@ -147,14 +149,14 @@ class Employee extends Authenticatable
                 return null;
             }
         }
+
         return null;
     }
 
     /**
      * Validate image data format
      *
-     * @param string $imageData
-     * @return bool
+     * @param  string  $imageData
      */
     public static function validateImageData($imageData): bool
     {
@@ -187,12 +189,10 @@ class Employee extends Authenticatable
 
     /**
      * Get image MIME type
-     *
-     * @return string|null
      */
     public function getImageMimeType(): ?string
     {
-        if (!$this->hasImage()) {
+        if (! $this->hasImage()) {
             return null;
         }
 
@@ -200,7 +200,7 @@ class Employee extends Authenticatable
             $tempFile = tempnam(sys_get_temp_dir(), 'img_mime');
             $base64Data = $this->getImageBase64Attribute();
 
-            if (!$base64Data) {
+            if (! $base64Data) {
                 return null;
             }
 
@@ -227,7 +227,7 @@ class Employee extends Authenticatable
      */
     public function getOptimizedImageUrlAttribute()
     {
-        if (!$this->hasImage()) {
+        if (! $this->hasImage()) {
             return null;
         }
 
@@ -235,7 +235,7 @@ class Employee extends Authenticatable
             $mimeType = $this->getImageMimeType();
             $base64Data = $this->getImageBase64Attribute();
 
-            if (!$base64Data) {
+            if (! $base64Data) {
                 return null;
             }
 
@@ -252,20 +252,16 @@ class Employee extends Authenticatable
 
     /**
      * Check if employee has an image.
-     *
-     * @return bool
      */
     public function hasImage(): bool
     {
         return isset($this->attributes['image_path']) &&
-               !empty($this->attributes['image_path']) &&
+               ! empty($this->attributes['image_path']) &&
                $this->getImageBase64Attribute() !== null;
     }
 
     /**
      * Get the image size in bytes.
-     *
-     * @return int
      */
     public function getImageSize(): int
     {
@@ -275,19 +271,21 @@ class Employee extends Authenticatable
                 if ($base64Data) {
                     // Calculate the size of the decoded image data
                     $decodedData = base64_decode($base64Data);
+
                     return $decodedData ? strlen($decodedData) : 0;
                 }
             } catch (\Exception $e) {
                 return 0;
             }
         }
+
         return 0;
     }
 
     /**
      * Hash the password before saving.
      *
-     * @param string $value
+     * @param  string  $value
      * @return void
      */
     public function setPasswordAttribute($value)
@@ -310,7 +308,7 @@ class Employee extends Authenticatable
     /**
      * Scope a query to only include active employees.
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
     public function scopeActive($query)
@@ -360,6 +358,7 @@ class Employee extends Authenticatable
 
     /**
      * Get projects where employee is directly assigned as primary manager
+     *
      * @deprecated Use managedProjects() instead for complete management relationships
      */
     public function directlyManagedProjects()
@@ -404,7 +403,8 @@ class Employee extends Authenticatable
      */
     public function roles()
     {
-        return $this->belongsToMany(Role::class, 'xxx_employee_role', 'employee_id', 'role_id');
+        return $this->belongsToMany(Role::class, 'xxx_user_roles', 'user_id', 'role_id')
+            ->wherePivot('is_active', true);
     }
 
     /**
@@ -429,9 +429,9 @@ class Employee extends Authenticatable
     public function rolesViaUserRoles()
     {
         return $this->belongsToMany(Role::class, 'xxx_user_roles', 'user_id', 'role_id')
-                    ->wherePivot('is_active', true)
-                    ->withPivot('is_active', 'assigned_by')
-                    ->withTimestamps();
+            ->wherePivot('is_active', true)
+            ->withPivot('is_active', 'assigned_by')
+            ->withTimestamps();
     }
 
     /**
@@ -448,11 +448,11 @@ class Employee extends Authenticatable
     public function hasPageAccess($pageId): bool
     {
         return $this->rolesViaUserRoles()
-                    ->whereHas('pages', function ($query) use ($pageId) {
-                        $query->where('xxx_pages.id', $pageId)
-                              ->where('xxx_page_role_permissions.is_active', true);
-                    })
-                    ->exists();
+            ->whereHas('pages', function ($query) use ($pageId) {
+                $query->where('xxx_pages.id', $pageId)
+                    ->where('xxx_page_role_permissions.is_active', true);
+            })
+            ->exists();
     }
 
     /**
@@ -464,7 +464,7 @@ class Employee extends Authenticatable
 
         return Page::whereHas('roles', function ($query) use ($roleIds) {
             $query->whereIn('xxx_roles.id', $roleIds)
-                  ->where('xxx_page_role_permissions.is_active', true);
+                ->where('xxx_page_role_permissions.is_active', true);
         })->where('is_active', true)->get();
     }
 
@@ -500,6 +500,14 @@ class Employee extends Authenticatable
     public function tasksAssignedByMe()
     {
         return $this->hasMany(AssignedTask::class, 'assigned_by');
+    }
+
+    /**
+     * Get project assignments for this employee
+     */
+    public function projectAssignments()
+    {
+        return $this->hasMany(ProjectEmployeeAssignment::class, 'employee_id');
     }
 
     /**
@@ -550,16 +558,19 @@ class Employee extends Authenticatable
     {
         $personalTasks = $this->personalTasks()->important()->get()->map(function ($task) {
             $task->task_type = 'personal';
+
             return $task;
         });
 
         $projectTasks = $this->projectTasks()->important()->get()->map(function ($task) {
             $task->task_type = 'project';
+
             return $task;
         });
 
         $assignedTasks = $this->assignedTasks()->important()->get()->map(function ($task) {
             $task->task_type = 'assigned';
+
             return $task;
         });
 
@@ -595,7 +606,7 @@ class Employee extends Authenticatable
                 'personal' => $personal[$status] ?? 0,
                 'project' => $project[$status] ?? 0,
                 'assigned' => $assigned[$status] ?? 0,
-                'total' => ($personal[$status] ?? 0) + ($project[$status] ?? 0) + ($assigned[$status] ?? 0)
+                'total' => ($personal[$status] ?? 0) + ($project[$status] ?? 0) + ($assigned[$status] ?? 0),
             ];
         }
 
@@ -615,7 +626,7 @@ class Employee extends Authenticatable
      */
     public function getManagedEmployees()
     {
-        if (!$this->isDepartmentManager()) {
+        if (! $this->isDepartmentManager()) {
             return collect();
         }
 
@@ -635,5 +646,49 @@ class Employee extends Authenticatable
     public function getAuthIdentifierName()
     {
         return 'work_email';
+    }
+
+    /**
+     * Get external identities for this user (SSO)
+     */
+    public function externalIdentities()
+    {
+        return $this->hasMany(ExternalIdentity::class, 'user_id');
+    }
+
+    /**
+     * Get refresh tokens for this user
+     */
+    public function refreshTokens()
+    {
+        return $this->hasMany(RefreshToken::class, 'user_id');
+    }
+
+    /**
+     * Get active refresh tokens for this user
+     */
+    public function activeRefreshTokens()
+    {
+        return $this->refreshTokens()
+            ->where('is_revoked', false)
+            ->where('expires_at', '>', now());
+    }
+
+    /**
+     * Find user by external identity
+     */
+    public static function findByExternalIdentity(string $provider, string $externalId): ?self
+    {
+        $identity = ExternalIdentity::findByProvider($provider, $externalId);
+
+        return $identity ? $identity->user : null;
+    }
+
+    /**
+     * Check if user is active
+     */
+    public function isActive(): bool
+    {
+        return $this->user_status === 'active';
     }
 }

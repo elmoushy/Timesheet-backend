@@ -1,14 +1,15 @@
 <?php
+
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
+use App\Models\PageRolePermission;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
@@ -44,24 +45,54 @@ class AuthController extends Controller
 
         // Find the employee by email
         $employee = Employee::where('work_email', $request->email)
-                     ->where('user_status', 'active')
-                     ->first();
+            ->where('user_status', 'active')
+            ->first();
 
-        if (!$employee || !Hash::check($request->password, $employee->password)) {
+        if (! $employee || ! Hash::check($request->password, $employee->password)) {
             return $this->fail('Invalid credentials or inactive account', 401);
         }
 
-        // Load role relationship to get the role name
-        $employee->load('role');
+        // Load active user roles with their roles
+        $employee->load(['activeUserRoles.role']);
+
+        // Get allowed pages for all user's active roles
+        $allowedPages = collect();
+
+        if ($employee->activeUserRoles->isNotEmpty()) {
+            // Get all active role IDs from user roles
+            $roleIds = $employee->activeUserRoles->pluck('role_id')->toArray();
+
+            // Get all allowed pages for these roles (avoiding duplicates)
+            $allowedPages = PageRolePermission::with('page')
+                ->whereIn('role_id', $roleIds)
+                ->where('is_active', true)
+                ->whereHas('page', function ($query) {
+                    $query->where('is_active', true);
+                })
+                ->get()
+                ->pluck('page')
+                ->unique('id') // Remove duplicate pages by ID
+                ->map(function ($page) {
+                    return [
+                        'id' => $page->id,
+                        'name' => $page->name,
+                    ];
+                })
+                ->values(); // Reset array keys after unique
+        }
+
+        // Get the primary role name (first active role)
+        $primaryRole = $employee->activeUserRoles->first()?->role;
 
         // Create token
         $token = $employee->createToken('auth_token')->plainTextToken;
 
         return $this->ok('Login successful', [
             'token' => $token,
-            'full_name' => $employee->first_name . ' ' . $employee->last_name,
-            'role' => $employee->role ? $employee->role->name : null,
+            'full_name' => $employee->first_name.' '.$employee->last_name,
+            'role' => $primaryRole ? $primaryRole->name : null,
             'employee_id' => $employee->id,
+            'allowed_pages' => $allowedPages,
         ]);
     }
 
@@ -84,7 +115,7 @@ class AuthController extends Controller
         $employee = Employee::where('work_email', $request->email)->first();
 
         // Check old password
-        if (!Hash::check($request->old_password, $employee->password)) {
+        if (! Hash::check($request->old_password, $employee->password)) {
             return $this->fail('Current password is incorrect', 401);
         }
 
@@ -96,33 +127,51 @@ class AuthController extends Controller
     }
 
     /**
-     * Check if token is valid
+     * Check if JWT token is valid
      */
     public function checkToken(Request $request): JsonResponse
     {
-        // If we get here, the token is valid (middleware already checked)
-        // Ensure authenticated user exists
-        if (!Auth::user()) {
+        // If we get here, the JWT token is valid (middleware already checked)
+        // Get authenticated user from JWT middleware
+        $user = $request->attributes->get('auth_user');
+
+        if (! $user) {
             return $this->ok('Token check completed', [
-                'active_token' => false
+                'active_token' => false,
             ]);
         }
 
         return $this->ok('Token check completed', [
-            'active_token' => true
+            'active_token' => true,
+            'user' => [
+                'id' => $user->id,
+                'email' => $user->work_email,
+                'first_name' => $user->first_name,
+                'last_name' => $user->last_name,
+                'employee_code' => $user->employee_code,
+                'is_active' => $user->isActive(),
+            ],
         ]);
     }
 
     /**
-     * Logout - revoke current token
+     * Logout - JWT tokens are stateless, so we just return success
+     * For actual token revocation, client should discard the token
      */
     public function logout(Request $request): JsonResponse
     {
-        // Revoke the token that was used to authenticate the current request
-        if ($request->user()) {
-            $request->user()->currentAccessToken()->delete();
+        // JWT tokens are stateless, so we can't revoke them server-side
+        // The client should discard the token
+        // For refresh token revocation, use the SSO logout endpoint instead
+
+        $user = $request->attributes->get('auth_user');
+        if ($user) {
+            Log::info('JWT logout', [
+                'user_id' => $user->id,
+                'email' => $user->work_email,
+            ]);
         }
 
-        return $this->ok('Logged out successfully');
+        return $this->ok('Logged out successfully. Please discard the token on client side.');
     }
 }

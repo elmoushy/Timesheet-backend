@@ -15,7 +15,6 @@ class ProjectAssignEmployeeController extends Controller
      * Display assignment requests based on the authenticated user's role
      * With filtering by status and search functionality
      *
-     * @param Request $request
      * @return \Illuminate\Http\Response
      */
     public function index(Request $request)
@@ -29,7 +28,7 @@ class ProjectAssignEmployeeController extends Controller
         if ($managedDepartmentIds->isEmpty()) {
             return response()->json([
                 'message' => 'You are not a manager of any department',
-                'data' => []
+                'data' => [],
             ], 200);
         }
 
@@ -41,19 +40,19 @@ class ProjectAssignEmployeeController extends Controller
         $query = ProjectEmployeeAssignment::whereIn('employee_id', $departmentEmployeeIds);
 
         // Filter by department_approval_status if provided
-        if ($request->has('status') && !empty($request->status)) {
+        if ($request->has('status') && ! empty($request->status)) {
             $status = $request->status;
             $query->where('department_approval_status', $status);
         }
 
         // Apply search if provided
-        if ($request->has('search') && !empty($request->search)) {
+        if ($request->has('search') && ! empty($request->search)) {
             $search = $request->search;
-            $query->whereHas('employee', function($q) use ($search) {
+            $query->whereHas('employee', function ($q) use ($search) {
                 $q->where('first_name', 'like', "%{$search}%")
-                  ->orWhere('last_name', 'like', "%{$search}%")
-                  ->orWhere('employee_code', 'like', "%{$search}%");
-            })->orWhereHas('project', function($q) use ($search) {
+                    ->orWhere('last_name', 'like', "%{$search}%")
+                    ->orWhere('employee_code', 'like', "%{$search}%");
+            })->orWhereHas('project', function ($q) use ($search) {
                 $q->where('project_name', 'like', "%{$search}%");
             });
         }
@@ -70,25 +69,24 @@ class ProjectAssignEmployeeController extends Controller
                 'department_approval_status' => $assignment->department_approval_status,
                 'project_name' => $assignment->project->project_name,
                 'employee' => [
-                    'name' => $assignment->employee->first_name . ' ' . $assignment->employee->last_name
+                    'name' => $assignment->employee->first_name.' '.$assignment->employee->last_name,
                 ],
                 'requester' => [
-                    'name' => $assignment->requester->first_name . ' ' . $assignment->requester->last_name
-                ]
+                    'name' => $assignment->requester->first_name.' '.$assignment->requester->last_name,
+                ],
             ];
         });
 
         return response()->json([
             'message' => 'Assignment requests retrieved successfully',
-            'data' => $transformedData
+            'data' => $transformedData,
         ], 200);
     }
 
     /**
      * Approve an employee assignment request
      *
-     * @param Request $request
-     * @param int $id
+     * @param  int  $id
      * @return \Illuminate\Http\Response
      */
     public function approve(Request $request, $id)
@@ -102,9 +100,9 @@ class ProjectAssignEmployeeController extends Controller
             ->where('department_id', $employee->department_id)
             ->exists();
 
-        if (!$isDepartmentManager) {
+        if (! $isDepartmentManager) {
             return response()->json([
-                'message' => 'You are not authorized to approve this request'
+                'message' => 'You are not authorized to approve this request',
             ], 403);
         }
 
@@ -115,20 +113,19 @@ class ProjectAssignEmployeeController extends Controller
         if ($success) {
             return response()->json([
                 'message' => 'Assignment request approved successfully',
-                'data' => $assignment
+                'data' => $assignment,
             ], 200);
         }
 
         return response()->json([
-            'message' => 'Failed to approve assignment request'
+            'message' => 'Failed to approve assignment request',
         ], 500);
     }
 
     /**
      * Reject an employee assignment request
      *
-     * @param Request $request
-     * @param int $id
+     * @param  int  $id
      * @return \Illuminate\Http\Response
      */
     public function reject(Request $request, $id)
@@ -142,9 +139,9 @@ class ProjectAssignEmployeeController extends Controller
             ->where('department_id', $employee->department_id)
             ->exists();
 
-        if (!$isDepartmentManager) {
+        if (! $isDepartmentManager) {
             return response()->json([
-                'message' => 'You are not authorized to reject this request'
+                'message' => 'You are not authorized to reject this request',
             ], 403);
         }
 
@@ -155,20 +152,19 @@ class ProjectAssignEmployeeController extends Controller
         if ($success) {
             return response()->json([
                 'message' => 'Assignment request rejected successfully',
-                'data' => $assignment
+                'data' => $assignment,
             ], 200);
         }
 
         return response()->json([
-            'message' => 'Failed to reject assignment request'
+            'message' => 'Failed to reject assignment request',
         ], 500);
     }
 
     /**
      * Resend a rejected assignment request
      *
-     * @param Request $request
-     * @param int $id
+     * @param  int  $id
      * @return \Illuminate\Http\Response
      */
     public function resend(Request $request, $id)
@@ -177,17 +173,17 @@ class ProjectAssignEmployeeController extends Controller
         $user = Auth::user();
 
         // Check if request is rejected and can be resent
-        if (!$assignment->isRejected()) {
+        if (! $assignment->isRejected()) {
             return response()->json([
-                'message' => 'Only rejected requests can be resent'
+                'message' => 'Only rejected requests can be resent',
             ], 400);
         }
 
         // Check if user is authorized to resend this request
         if ($assignment->requested_by != $user->id &&
-            !$user->managedProjects()->where('project_id', $assignment->project_id)->exists()) {
+            ! $user->managedProjects()->where('project_id', $assignment->project_id)->exists()) {
             return response()->json([
-                'message' => 'You are not authorized to resend this request'
+                'message' => 'You are not authorized to resend this request',
             ], 403);
         }
 
@@ -205,12 +201,12 @@ class ProjectAssignEmployeeController extends Controller
         if ($assignment->save()) {
             return response()->json([
                 'message' => 'Assignment request resent successfully',
-                'data' => $assignment
+                'data' => $assignment,
             ], 200);
         }
 
         return response()->json([
-            'message' => 'Failed to resend assignment request'
+            'message' => 'Failed to resend assignment request',
         ], 500);
     }
 }

@@ -66,13 +66,6 @@ class TimesheetWorkflowHistory extends Model
 
     /**
      * Create a new workflow history entry.
-     *
-     * @param int $timesheetId
-     * @param string $stage
-     * @param string $action
-     * @param int $actedBy
-     * @param string|null $comment
-     * @return self
      */
     public static function createEntry(
         int $timesheetId,

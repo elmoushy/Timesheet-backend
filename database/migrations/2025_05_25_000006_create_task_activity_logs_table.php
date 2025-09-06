@@ -22,8 +22,8 @@ return new class extends Migration
             $table->timestamps();
 
             $table->foreign('employee_id', 'fk_activity_emp')
-                  ->references('id')->on('xxx_employees')
-                  ->onDelete('cascade');
+                ->references('id')->on('xxx_employees')
+                ->onDelete('cascade');
 
             // Indexes for better performance
             $table->index(['task_type', 'task_id']);

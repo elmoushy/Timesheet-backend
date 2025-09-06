@@ -4,11 +4,12 @@ namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
 use App\Models\AssignedTask;
-use App\Models\Task;
+use App\Models\BulkTaskOperation;
+use App\Models\Department;
+use App\Models\DepartmentManager;
 use App\Models\Employee;
 use App\Models\EmployeeWorkloadCapacity;
-use App\Models\BulkTaskOperation;
-use App\Models\DepartmentManager;
+use App\Models\Task;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -35,18 +36,38 @@ class DepartmentManagerController extends Controller
     private function isDepartmentManager(): bool
     {
         $user = Auth::user();
+
         return DepartmentManager::where('employee_id', $user->id)->exists();
     }
 
     /**
      * Get departments managed by the authenticated user
+     * For Admin users: return all departments
+     * For Department Managers: return managed departments
+     * For other users: return empty array (they can still access endpoints but see no data)
      */
     private function getManagedDepartmentIds(): array
     {
         $user = Auth::user();
-        return DepartmentManager::where('employee_id', $user->id)
+
+        // Check if user has Admin role
+        $hasAdminRole = $user->activeUserRoles()
+            ->whereHas('role', function ($query) {
+                $query->where('name', 'Admin');
+            })
+            ->exists();
+
+        if ($hasAdminRole) {
+            // Admin users can see all departments
+            return \App\Models\Department::pluck('id')->toArray();
+        }
+
+        // Check if user is a department manager
+        $managedDepartmentIds = DepartmentManager::where('employee_id', $user->id)
             ->pluck('department_id')
             ->toArray();
+
+        return $managedDepartmentIds;
     }
 
     /* ─────────────────────  Department Manager Dashboard  ───────────────────── */
@@ -57,10 +78,6 @@ class DepartmentManagerController extends Controller
     public function getDashboard(Request $request): JsonResponse
     {
         try {
-            if (!$this->isDepartmentManager()) {
-                return $this->fail('Access denied. Department manager role required.', 403);
-            }
-
             $managedDepartmentIds = $this->getManagedDepartmentIds();
 
             // Get employees in managed departments
@@ -80,7 +97,7 @@ class DepartmentManagerController extends Controller
                 ->orderBy('created_at', 'desc')
                 ->take(10)
                 ->get()
-                ->map(function($task) {
+                ->map(function ($task) {
                     return [
                         'id' => $task->id,
                         'task_id' => $task->task_id,
@@ -122,7 +139,7 @@ class DepartmentManagerController extends Controller
             return $this->ok('Department manager dashboard retrieved successfully', $dashboard);
 
         } catch (Throwable $e) {
-            return $this->fail('Error retrieving dashboard: ' . $e->getMessage(), 500);
+            return $this->fail('Error retrieving dashboard: '.$e->getMessage(), 500);
         }
     }
 
@@ -134,10 +151,6 @@ class DepartmentManagerController extends Controller
     public function getAvailableTasks(Request $request): JsonResponse
     {
         try {
-            if (!$this->isDepartmentManager()) {
-                return $this->fail('Access denied. Department manager role required.', 403);
-            }
-
             $managedDepartmentIds = $this->getManagedDepartmentIds();
 
             $tasks = Task::whereIn('department_id', $managedDepartmentIds)
@@ -147,7 +160,7 @@ class DepartmentManagerController extends Controller
             return $this->ok('Available tasks retrieved successfully', $tasks);
 
         } catch (Throwable $e) {
-            return $this->fail('Error retrieving available tasks: ' . $e->getMessage(), 500);
+            return $this->fail('Error retrieving available tasks: '.$e->getMessage(), 500);
         }
     }
 
@@ -157,10 +170,6 @@ class DepartmentManagerController extends Controller
     public function getManagedEmployees(Request $request): JsonResponse
     {
         try {
-            if (!$this->isDepartmentManager()) {
-                return $this->fail('Access denied. Department manager role required.', 403);
-            }
-
             $managedDepartmentIds = $this->getManagedDepartmentIds();
 
             $employees = Employee::whereIn('department_id', $managedDepartmentIds)
@@ -172,8 +181,28 @@ class DepartmentManagerController extends Controller
             $employeesWithWorkload = $employees->map(function ($employee) {
                 $weekStart = now()->startOfWeek()->toDateString();
                 $workload = EmployeeWorkloadCapacity::where('employee_id', $employee->id)
-                    ->where('week_start_date', $weekStart)
+                    ->whereDate('week_start_date', $weekStart)
                     ->first();
+
+                // Get workload values with defaults
+                $capacityHours = $workload->weekly_capacity_hours ?? 40;
+                $plannedHours = $workload->current_planned_hours ?? 0;
+                $percentage = $workload->workload_percentage ?? 0;
+
+                // Calculate status properly when no workload record exists
+                $status = $workload->workload_status ?? null;
+                if (! $status) {
+                    // Calculate status based on percentage
+                    if ($percentage < 70) {
+                        $status = 'under_utilized';
+                    } elseif ($percentage <= 100) {
+                        $status = 'optimal';
+                    } elseif ($percentage <= 120) {
+                        $status = 'over_loaded';
+                    } else {
+                        $status = 'critical';
+                    }
+                }
 
                 return [
                     'id' => $employee->id,
@@ -181,18 +210,18 @@ class DepartmentManagerController extends Controller
                     'email' => $employee->work_email,
                     'department' => $employee->department->name ?? 'Unknown',
                     'workload' => [
-                        'capacity_hours' => $workload->weekly_capacity_hours ?? 40,
-                        'planned_hours' => $workload->current_planned_hours ?? 0,
-                        'percentage' => $workload->workload_percentage ?? 0,
-                        'status' => $workload->workload_status ?? 'optimal',
-                    ]
+                        'capacity_hours' => $capacityHours,
+                        'planned_hours' => $plannedHours,
+                        'percentage' => $percentage,
+                        'status' => $status,
+                    ],
                 ];
             });
 
             return $this->ok('Managed employees retrieved successfully', $employeesWithWorkload);
 
         } catch (Throwable $e) {
-            return $this->fail('Error retrieving managed employees: ' . $e->getMessage(), 500);
+            return $this->fail('Error retrieving managed employees: '.$e->getMessage(), 500);
         }
     }
 
@@ -217,7 +246,7 @@ class DepartmentManagerController extends Controller
         }
 
         try {
-            if (!$this->isDepartmentManager()) {
+            if (! $this->isDepartmentManager()) {
                 return $this->fail('Access denied. Department manager role required.', 403);
             }
 
@@ -226,7 +255,7 @@ class DepartmentManagerController extends Controller
 
             // Verify task belongs to managed department
             $task = Task::whereIn('department_id', $managedDepartmentIds)->find($request->task_id);
-            if (!$task) {
+            if (! $task) {
                 return $this->fail('Task not found in your managed departments', 404);
             }
 
@@ -258,6 +287,7 @@ class DepartmentManagerController extends Controller
                     if ($existingAssignment) {
                         $employee = $employees->find($employeeId);
                         $alreadyAssigned[] = $employee ? $employee->getFullNameAttribute() : "Employee ID: $employeeId";
+
                         continue;
                     }
 
@@ -272,7 +302,8 @@ class DepartmentManagerController extends Controller
                         'assignment_notes' => $request->assignment_notes,
                     ]);
 
-                    // Update employee workload if estimated hours provided
+                    // Note: Employee workload is now automatically updated via AssignedTask model events
+                    // The following updateEmployeeWorkload call is kept for redundancy/backward compatibility
                     if ($request->estimated_hours) {
                         $this->updateEmployeeWorkload($employeeId, $request->estimated_hours);
                     }
@@ -285,7 +316,7 @@ class DepartmentManagerController extends Controller
                 } catch (Throwable $e) {
                     $employee = $employees->find($employeeId);
                     $employeeName = $employee ? $employee->getFullNameAttribute() : "Employee ID: $employeeId";
-                    $errors[] = "Failed to assign to $employeeName: " . $e->getMessage();
+                    $errors[] = "Failed to assign to $employeeName: ".$e->getMessage();
                 }
             }
 
@@ -311,7 +342,8 @@ class DepartmentManagerController extends Controller
 
         } catch (Throwable $e) {
             DB::rollBack();
-            return $this->fail('Error assigning task: ' . $e->getMessage(), 500);
+
+            return $this->fail('Error assigning task: '.$e->getMessage(), 500);
         }
     }
 
@@ -331,7 +363,7 @@ class DepartmentManagerController extends Controller
         }
 
         try {
-            if (!$this->isDepartmentManager()) {
+            if (! $this->isDepartmentManager()) {
                 return $this->fail('Access denied. Department manager role required.', 403);
             }
 
@@ -340,13 +372,13 @@ class DepartmentManagerController extends Controller
 
             // Verify task belongs to managed department
             $task = Task::whereIn('department_id', $managedDepartmentIds)->find($request->task_id);
-            if (!$task) {
+            if (! $task) {
                 return $this->fail('Task not found in your managed departments', 404);
             }
 
             // Verify employee belongs to managed department
             $employee = Employee::whereIn('department_id', $managedDepartmentIds)->find($request->employee_id);
-            if (!$employee) {
+            if (! $employee) {
                 return $this->fail('Employee not found in your managed departments', 404);
             }
 
@@ -355,13 +387,14 @@ class DepartmentManagerController extends Controller
                 ->where('assigned_to', $request->employee_id)
                 ->first();
 
-            if (!$assignedTask) {
+            if (! $assignedTask) {
                 return $this->fail('Task assignment not found for this employee', 404);
             }
 
             DB::beginTransaction();
 
-            // Update employee workload if estimated hours were provided
+            // Note: Employee workload is now automatically updated via AssignedTask model events
+            // The following updateEmployeeWorkload call is kept for redundancy/backward compatibility
             if ($assignedTask->estimated_hours) {
                 $this->updateEmployeeWorkload($request->employee_id, -$assignedTask->estimated_hours);
             }
@@ -381,7 +414,8 @@ class DepartmentManagerController extends Controller
 
         } catch (Throwable $e) {
             DB::rollBack();
-            return $this->fail('Error removing task assignment: ' . $e->getMessage(), 500);
+
+            return $this->fail('Error removing task assignment: '.$e->getMessage(), 500);
         }
     }
 
@@ -404,7 +438,7 @@ class DepartmentManagerController extends Controller
         }
 
         try {
-            if (!$this->isDepartmentManager()) {
+            if (! $this->isDepartmentManager()) {
                 return $this->fail('Access denied. Department manager role required.', 403);
             }
 
@@ -413,13 +447,13 @@ class DepartmentManagerController extends Controller
 
             // Verify task belongs to managed department
             $task = Task::whereIn('department_id', $managedDepartmentIds)->find($request->task_id);
-            if (!$task) {
+            if (! $task) {
                 return $this->fail('Task not found in your managed departments', 404);
             }
 
             // Verify employee belongs to managed department
             $employee = Employee::whereIn('department_id', $managedDepartmentIds)->find($request->employee_id);
-            if (!$employee) {
+            if (! $employee) {
                 return $this->fail('Employee not found in your managed departments', 404);
             }
 
@@ -428,7 +462,7 @@ class DepartmentManagerController extends Controller
                 ->where('assigned_to', $request->employee_id)
                 ->first();
 
-            if (!$assignedTask) {
+            if (! $assignedTask) {
                 return $this->fail('Task assignment not found for this employee', 404);
             }
 
@@ -458,7 +492,8 @@ class DepartmentManagerController extends Controller
                 if ($oldValues['estimated_hours'] !== $request->estimated_hours) {
                     $changedFields[] = 'estimated_hours';
 
-                    // Update employee workload
+                    // Note: Employee workload is now automatically updated via AssignedTask model events
+                    // The following updateEmployeeWorkload call is kept for redundancy/backward compatibility
                     $hoursDifference = $request->estimated_hours - ($oldValues['estimated_hours'] ?? 0);
                     if ($hoursDifference !== 0) {
                         $this->updateEmployeeWorkload($request->employee_id, $hoursDifference);
@@ -506,7 +541,8 @@ class DepartmentManagerController extends Controller
 
         } catch (Throwable $e) {
             DB::rollBack();
-            return $this->fail('Error updating task assignment: ' . $e->getMessage(), 500);
+
+            return $this->fail('Error updating task assignment: '.$e->getMessage(), 500);
         }
     }
 
@@ -525,7 +561,7 @@ class DepartmentManagerController extends Controller
         }
 
         try {
-            if (!$this->isDepartmentManager()) {
+            if (! $this->isDepartmentManager()) {
                 return $this->fail('Access denied. Department manager role required.', 403);
             }
 
@@ -533,13 +569,13 @@ class DepartmentManagerController extends Controller
 
             // Verify task belongs to managed department
             $task = Task::whereIn('department_id', $managedDepartmentIds)->find($request->task_id);
-            if (!$task) {
+            if (! $task) {
                 return $this->fail('Task not found in your managed departments', 404);
             }
 
             // Verify employee belongs to managed department
             $employee = Employee::whereIn('department_id', $managedDepartmentIds)->find($request->employee_id);
-            if (!$employee) {
+            if (! $employee) {
                 return $this->fail('Employee not found in your managed departments', 404);
             }
 
@@ -549,7 +585,7 @@ class DepartmentManagerController extends Controller
                 ->with(['masterTask', 'assignedEmployee', 'assignedByManager'])
                 ->first();
 
-            if (!$assignedTask) {
+            if (! $assignedTask) {
                 return $this->fail('Task assignment not found for this employee', 404);
             }
 
@@ -588,7 +624,7 @@ class DepartmentManagerController extends Controller
             return $this->ok('Task assignment details retrieved successfully', $assignmentDetails);
 
         } catch (Throwable $e) {
-            return $this->fail('Error retrieving task assignment details: ' . $e->getMessage(), 500);
+            return $this->fail('Error retrieving task assignment details: '.$e->getMessage(), 500);
         }
     }
 
@@ -600,10 +636,6 @@ class DepartmentManagerController extends Controller
     public function getWorkloadHeatmap(Request $request): JsonResponse
     {
         try {
-            if (!$this->isDepartmentManager()) {
-                return $this->fail('Access denied. Department manager role required.', 403);
-            }
-
             $managedDepartmentIds = $this->getManagedDepartmentIds();
             $employees = Employee::whereIn('department_id', $managedDepartmentIds)->get();
 
@@ -612,7 +644,7 @@ class DepartmentManagerController extends Controller
             return $this->ok('Workload heatmap retrieved successfully', $workloadData);
 
         } catch (Throwable $e) {
-            return $this->fail('Error retrieving workload heatmap: ' . $e->getMessage(), 500);
+            return $this->fail('Error retrieving workload heatmap: '.$e->getMessage(), 500);
         }
     }
 
@@ -636,7 +668,7 @@ class DepartmentManagerController extends Controller
         }
 
         try {
-            if (!$this->isDepartmentManager()) {
+            if (! $this->isDepartmentManager()) {
                 return $this->fail('Access denied. Department manager role required.', 403);
             }
 
@@ -645,7 +677,7 @@ class DepartmentManagerController extends Controller
 
             // Verify all tasks belong to managed employees
             $tasks = AssignedTask::whereIn('id', $request->task_ids)
-                ->whereHas('assignedEmployee', function($query) use ($managedDepartmentIds) {
+                ->whereHas('assignedEmployee', function ($query) use ($managedDepartmentIds) {
                     $query->whereIn('department_id', $managedDepartmentIds);
                 })
                 ->get();
@@ -671,7 +703,7 @@ class DepartmentManagerController extends Controller
             return $this->ok('Bulk operation initiated successfully', $bulkOperation);
 
         } catch (Throwable $e) {
-            return $this->fail('Error initiating bulk operation: ' . $e->getMessage(), 500);
+            return $this->fail('Error initiating bulk operation: '.$e->getMessage(), 500);
         }
     }
 
@@ -705,7 +737,7 @@ class DepartmentManagerController extends Controller
             ->map(function ($workload) {
                 return [
                     'employee_id' => $workload->employee_id,
-                    'employee_name' => $workload->employee->first_name . ' ' . $workload->employee->last_name,
+                    'employee_name' => $workload->employee->first_name.' '.$workload->employee->last_name,
                     'capacity_hours' => $workload->weekly_capacity_hours,
                     'planned_hours' => $workload->current_planned_hours,
                     'percentage' => $workload->workload_percentage,
@@ -718,7 +750,7 @@ class DepartmentManagerController extends Controller
 
     private function getWorkloadColor(string $status): string
     {
-        return match($status) {
+        return match ($status) {
             'under_utilized' => '#90EE90', // Light green
             'optimal' => '#32CD32',        // Green
             'over_loaded' => '#FFA500',    // Orange
@@ -729,20 +761,30 @@ class DepartmentManagerController extends Controller
 
     private function updateEmployeeWorkload(int $employeeId, int $hours): void
     {
-        $weekStart = now()->startOfWeek()->toDateString();
+        $weekStart = now()->startOfWeek();
 
-        $workload = EmployeeWorkloadCapacity::firstOrCreate(
-            [
+        // Find existing record by employee_id and week_start_date (comparing dates only)
+        $workload = EmployeeWorkloadCapacity::where('employee_id', $employeeId)
+            ->whereDate('week_start_date', $weekStart->toDateString())
+            ->first();
+
+        // If no record exists, create one
+        if (! $workload) {
+            $workload = new EmployeeWorkloadCapacity([
                 'employee_id' => $employeeId,
-                'week_start_date' => $weekStart
-            ],
-            [
+                'week_start_date' => $weekStart->toDateString(),
                 'weekly_capacity_hours' => 40,
                 'current_planned_hours' => 0,
-            ]
-        );
+                'workload_percentage' => 0,
+                'workload_status' => 'optimal',
+            ]);
+        }
 
-        $workload->current_planned_hours += $hours;
+        // Update the planned hours
+        $newPlannedHours = $workload->current_planned_hours + $hours;
+
+        // Ensure planned hours don't go below zero
+        $workload->current_planned_hours = max(0, $newPlannedHours);
         $workload->workload_percentage = ($workload->current_planned_hours / $workload->weekly_capacity_hours) * 100;
 
         // Update status based on percentage
@@ -774,7 +816,7 @@ class DepartmentManagerController extends Controller
                     $processedCount++;
                 } catch (Throwable $e) {
                     $failedCount++;
-                    $errors[] = "Task ID {$taskId}: " . $e->getMessage();
+                    $errors[] = "Task ID {$taskId}: ".$e->getMessage();
                 }
             }
 
@@ -818,7 +860,6 @@ class DepartmentManagerController extends Controller
         }
     }
 
-
     private function logTaskActivity(string $taskType, int $taskId, int $employeeId, string $action, ?string $field = null, ?string $oldValue = null, ?string $newValue = null): void
     {
         \App\Models\TaskActivityLog::create([
@@ -833,19 +874,41 @@ class DepartmentManagerController extends Controller
     }
 
     /**
-     * Get employees in managed departments (simple list for dropdowns)
+     * Get employees eligible for assignment to a specific task (simple list for dropdowns)
+     * Returns employees who are approved for the project containing the task
      */
     public function getManagedEmployeesSimple(Request $request): JsonResponse
     {
         try {
-            if (!$this->isDepartmentManager()) {
+            if (! $this->isDepartmentManager()) {
                 return $this->fail('Access denied. Department manager role required.', 403);
+            }
+
+            // Validate task_id parameter
+            $taskId = $request->input('task_id');
+            if (! $taskId) {
+                return $this->fail('Task ID is required.', 422);
+            }
+
+            // Find the task and get its project
+            $task = Task::find($taskId);
+            if (! $task) {
+                return $this->fail('Task not found.', 404);
             }
 
             $managedDepartmentIds = $this->getManagedDepartmentIds();
 
+            // Get employees who are:
+            // 1. Assigned to the project that contains this task
+            // 2. Have approved project assignment status (not pending)
+            // 3. Are in managed departments
+            // 4. Are active
             $employees = Employee::whereIn('department_id', $managedDepartmentIds)
                 ->where('user_status', 'active')
+                ->whereHas('projectAssignments', function ($query) use ($task) {
+                    $query->where('project_id', $task->project_id)
+                        ->where('department_approval_status', 'approved');
+                })
                 ->select('id', 'first_name', 'middle_name', 'last_name', 'work_email', 'department_id')
                 ->with('department:id,name')
                 ->get()
@@ -854,14 +917,14 @@ class DepartmentManagerController extends Controller
                         'id' => $employee->id,
                         'name' => $employee->getFullNameAttribute(),
                         'email' => $employee->work_email,
-                        'department_name' => $employee->department->name ?? 'Unknown'
+                        'department_name' => $employee->department->name ?? 'Unknown',
                     ];
                 });
 
-            return $this->ok('Managed employees list retrieved successfully', $employees);
+            return $this->ok('Eligible employees for task assignment retrieved successfully', $employees);
 
         } catch (Throwable $e) {
-            return $this->fail('Error retrieving managed employees list: ' . $e->getMessage(), 500);
+            return $this->fail('Error retrieving managed employees list: '.$e->getMessage(), 500);
         }
     }
 
@@ -873,7 +936,7 @@ class DepartmentManagerController extends Controller
     public function getAssignedTasks(Request $request): JsonResponse
     {
         try {
-            if (!$this->isDepartmentManager()) {
+            if (! $this->isDepartmentManager()) {
                 return $this->fail('Access denied. Department manager role required.', 403);
             }
 
@@ -901,7 +964,7 @@ class DepartmentManagerController extends Controller
             return $this->ok('Assigned tasks retrieved successfully', $tasks);
 
         } catch (Throwable $e) {
-            return $this->fail('Error retrieving assigned tasks: ' . $e->getMessage(), 500);
+            return $this->fail('Error retrieving assigned tasks: '.$e->getMessage(), 500);
         }
     }
 
@@ -919,13 +982,13 @@ class DepartmentManagerController extends Controller
         }
 
         try {
-            if (!$this->isDepartmentManager()) {
+            if (! $this->isDepartmentManager()) {
                 return $this->fail('Access denied. Department manager role required.', 403);
             }
 
             $managedDepartmentIds = $this->getManagedDepartmentIds();
 
-            $assignedTask = AssignedTask::whereHas('assignedEmployee', function($query) use ($managedDepartmentIds) {
+            $assignedTask = AssignedTask::whereHas('assignedEmployee', function ($query) use ($managedDepartmentIds) {
                 $query->whereIn('department_id', $managedDepartmentIds);
             })->findOrFail($id);
 
@@ -938,7 +1001,7 @@ class DepartmentManagerController extends Controller
             return $this->ok('Task permissions updated successfully', $assignedTask);
 
         } catch (Throwable $e) {
-            return $this->fail('Error updating task permissions: ' . $e->getMessage(), 500);
+            return $this->fail('Error updating task permissions: '.$e->getMessage(), 500);
         }
     }
 
@@ -957,13 +1020,13 @@ class DepartmentManagerController extends Controller
         }
 
         try {
-            if (!$this->isDepartmentManager()) {
+            if (! $this->isDepartmentManager()) {
                 return $this->fail('Access denied. Department manager role required.', 403);
             }
 
             $managedDepartmentIds = $this->getManagedDepartmentIds();
 
-            $assignedTask = AssignedTask::whereHas('assignedEmployee', function($query) use ($managedDepartmentIds) {
+            $assignedTask = AssignedTask::whereHas('assignedEmployee', function ($query) use ($managedDepartmentIds) {
                 $query->whereIn('department_id', $managedDepartmentIds);
             })->findOrFail($id);
 
@@ -980,7 +1043,7 @@ class DepartmentManagerController extends Controller
             return $this->ok('Task status updated successfully', $assignedTask);
 
         } catch (Throwable $e) {
-            return $this->fail('Error updating task status: ' . $e->getMessage(), 500);
+            return $this->fail('Error updating task status: '.$e->getMessage(), 500);
         }
     }
 
@@ -990,13 +1053,13 @@ class DepartmentManagerController extends Controller
     public function deleteAssignedTask($id): JsonResponse
     {
         try {
-            if (!$this->isDepartmentManager()) {
+            if (! $this->isDepartmentManager()) {
                 return $this->fail('Access denied. Department manager role required.', 403);
             }
 
             $managedDepartmentIds = $this->getManagedDepartmentIds();
 
-            $assignedTask = AssignedTask::whereHas('assignedEmployee', function($query) use ($managedDepartmentIds) {
+            $assignedTask = AssignedTask::whereHas('assignedEmployee', function ($query) use ($managedDepartmentIds) {
                 $query->whereIn('department_id', $managedDepartmentIds);
             })->findOrFail($id);
 
@@ -1007,7 +1070,7 @@ class DepartmentManagerController extends Controller
             return $this->ok('Assigned task deleted successfully');
 
         } catch (Throwable $e) {
-            return $this->fail('Error deleting assigned task: ' . $e->getMessage(), 500);
+            return $this->fail('Error deleting assigned task: '.$e->getMessage(), 500);
         }
     }
 
@@ -1032,7 +1095,7 @@ class DepartmentManagerController extends Controller
         }
 
         try {
-            if (!$this->isDepartmentManager()) {
+            if (! $this->isDepartmentManager()) {
                 return $this->fail('Access denied. Department manager role required.', 403);
             }
 
@@ -1050,7 +1113,7 @@ class DepartmentManagerController extends Controller
 
             // Verify employee belongs to managed department
             $employee = Employee::whereIn('department_id', $managedDepartmentIds)->find($request->employee_id);
-            if (!$employee) {
+            if (! $employee) {
                 return $this->fail('Employee not found in your managed departments', 404);
             }
 
@@ -1068,6 +1131,7 @@ class DepartmentManagerController extends Controller
 
                     if ($existing) {
                         $errors[] = "Task ID {$taskId} is already assigned to this employee";
+
                         continue;
                     }
 
@@ -1084,7 +1148,7 @@ class DepartmentManagerController extends Controller
                     $this->logTaskActivity('assigned', $assignedTask->id, $manager->id, 'created');
 
                 } catch (Throwable $e) {
-                    $errors[] = "Task ID {$taskId}: " . $e->getMessage();
+                    $errors[] = "Task ID {$taskId}: ".$e->getMessage();
                 }
             }
 
@@ -1100,7 +1164,8 @@ class DepartmentManagerController extends Controller
 
         } catch (Throwable $e) {
             DB::rollBack();
-            return $this->fail('Error in bulk task assignment: ' . $e->getMessage(), 500);
+
+            return $this->fail('Error in bulk task assignment: '.$e->getMessage(), 500);
         }
     }
 
@@ -1121,14 +1186,14 @@ class DepartmentManagerController extends Controller
         }
 
         try {
-            if (!$this->isDepartmentManager()) {
+            if (! $this->isDepartmentManager()) {
                 return $this->fail('Access denied. Department manager role required.', 403);
             }
 
             $managedDepartmentIds = $this->getManagedDepartmentIds();
 
             $tasks = AssignedTask::whereIn('id', $request->task_ids)
-                ->whereHas('assignedEmployee', function($query) use ($managedDepartmentIds) {
+                ->whereHas('assignedEmployee', function ($query) use ($managedDepartmentIds) {
                     $query->whereIn('department_id', $managedDepartmentIds);
                 })
                 ->get();
@@ -1165,7 +1230,8 @@ class DepartmentManagerController extends Controller
 
         } catch (Throwable $e) {
             DB::rollBack();
-            return $this->fail('Error in bulk status update: ' . $e->getMessage(), 500);
+
+            return $this->fail('Error in bulk status update: '.$e->getMessage(), 500);
         }
     }
 
@@ -1186,14 +1252,14 @@ class DepartmentManagerController extends Controller
         }
 
         try {
-            if (!$this->isDepartmentManager()) {
+            if (! $this->isDepartmentManager()) {
                 return $this->fail('Access denied. Department manager role required.', 403);
             }
 
             $managedDepartmentIds = $this->getManagedDepartmentIds();
 
             $tasks = AssignedTask::whereIn('id', $request->task_ids)
-                ->whereHas('assignedEmployee', function($query) use ($managedDepartmentIds) {
+                ->whereHas('assignedEmployee', function ($query) use ($managedDepartmentIds) {
                     $query->whereIn('department_id', $managedDepartmentIds);
                 })
                 ->get();
@@ -1229,7 +1295,8 @@ class DepartmentManagerController extends Controller
 
         } catch (Throwable $e) {
             DB::rollBack();
-            return $this->fail('Error in bulk deadline update: ' . $e->getMessage(), 500);
+
+            return $this->fail('Error in bulk deadline update: '.$e->getMessage(), 500);
         }
     }
 
@@ -1239,7 +1306,7 @@ class DepartmentManagerController extends Controller
     public function getBulkOperationHistory(Request $request): JsonResponse
     {
         try {
-            if (!$this->isDepartmentManager()) {
+            if (! $this->isDepartmentManager()) {
                 return $this->fail('Access denied. Department manager role required.', 403);
             }
 
@@ -1252,7 +1319,7 @@ class DepartmentManagerController extends Controller
             return $this->ok('Bulk operation history retrieved successfully', $operations);
 
         } catch (Throwable $e) {
-            return $this->fail('Error retrieving bulk operation history: ' . $e->getMessage(), 500);
+            return $this->fail('Error retrieving bulk operation history: '.$e->getMessage(), 500);
         }
     }
 
@@ -1262,7 +1329,7 @@ class DepartmentManagerController extends Controller
     public function getBulkOperationStatus($id): JsonResponse
     {
         try {
-            if (!$this->isDepartmentManager()) {
+            if (! $this->isDepartmentManager()) {
                 return $this->fail('Access denied. Department manager role required.', 403);
             }
 
@@ -1274,7 +1341,7 @@ class DepartmentManagerController extends Controller
             return $this->ok('Bulk operation status retrieved successfully', $operation);
 
         } catch (Throwable $e) {
-            return $this->fail('Error retrieving bulk operation status: ' . $e->getMessage(), 500);
+            return $this->fail('Error retrieving bulk operation status: '.$e->getMessage(), 500);
         }
     }
 
@@ -1286,7 +1353,7 @@ class DepartmentManagerController extends Controller
     public function getEmployeeWorkloadCapacity($employeeId): JsonResponse
     {
         try {
-            if (!$this->isDepartmentManager()) {
+            if (! $this->isDepartmentManager()) {
                 return $this->fail('Access denied. Department manager role required.', 403);
             }
 
@@ -1301,7 +1368,7 @@ class DepartmentManagerController extends Controller
                 ->where('week_start_date', $weekStart)
                 ->first();
 
-            if (!$workload) {
+            if (! $workload) {
                 $workload = [
                     'employee_id' => $employeeId,
                     'week_start_date' => $weekStart,
@@ -1315,7 +1382,7 @@ class DepartmentManagerController extends Controller
             return $this->ok('Employee workload capacity retrieved successfully', $workload);
 
         } catch (Throwable $e) {
-            return $this->fail('Error retrieving employee workload capacity: ' . $e->getMessage(), 500);
+            return $this->fail('Error retrieving employee workload capacity: '.$e->getMessage(), 500);
         }
     }
 
@@ -1333,7 +1400,7 @@ class DepartmentManagerController extends Controller
         }
 
         try {
-            if (!$this->isDepartmentManager()) {
+            if (! $this->isDepartmentManager()) {
                 return $this->fail('Access denied. Department manager role required.', 403);
             }
 
@@ -1347,7 +1414,7 @@ class DepartmentManagerController extends Controller
             $workload = EmployeeWorkloadCapacity::updateOrCreate(
                 [
                     'employee_id' => $employeeId,
-                    'week_start_date' => $weekStart
+                    'week_start_date' => $weekStart,
                 ],
                 [
                     'weekly_capacity_hours' => $request->weekly_capacity_hours,
@@ -1372,7 +1439,7 @@ class DepartmentManagerController extends Controller
             return $this->ok('Workload capacity updated successfully', $workload);
 
         } catch (Throwable $e) {
-            return $this->fail('Error updating workload capacity: ' . $e->getMessage(), 500);
+            return $this->fail('Error updating workload capacity: '.$e->getMessage(), 500);
         }
     }
 
@@ -1382,7 +1449,7 @@ class DepartmentManagerController extends Controller
     public function getWorkloadDistribution(Request $request): JsonResponse
     {
         try {
-            if (!$this->isDepartmentManager()) {
+            if (! $this->isDepartmentManager()) {
                 return $this->fail('Access denied. Department manager role required.', 403);
             }
 
@@ -1410,7 +1477,7 @@ class DepartmentManagerController extends Controller
             return $this->ok('Workload distribution retrieved successfully', $distribution);
 
         } catch (Throwable $e) {
-            return $this->fail('Error retrieving workload distribution: ' . $e->getMessage(), 500);
+            return $this->fail('Error retrieving workload distribution: '.$e->getMessage(), 500);
         }
     }
 
@@ -1420,7 +1487,7 @@ class DepartmentManagerController extends Controller
     public function getWorkloadRecommendations(Request $request): JsonResponse
     {
         try {
-            if (!$this->isDepartmentManager()) {
+            if (! $this->isDepartmentManager()) {
                 return $this->fail('Access denied. Department manager role required.', 403);
             }
 
@@ -1435,7 +1502,9 @@ class DepartmentManagerController extends Controller
                     ->where('week_start_date', $weekStart)
                     ->first();
 
-                if (!$workload) continue;
+                if (! $workload) {
+                    continue;
+                }
 
                 $recommendation = [
                     'employee_id' => $employee->id,
@@ -1448,15 +1517,15 @@ class DepartmentManagerController extends Controller
                 switch ($workload->workload_status) {
                     case 'under_utilized':
                         $recommendation['recommendations'][] = 'Consider assigning additional tasks';
-                        $recommendation['recommendations'][] = 'Available capacity: ' . (100 - $workload->workload_percentage) . '%';
+                        $recommendation['recommendations'][] = 'Available capacity: '.(100 - $workload->workload_percentage).'%';
                         break;
                     case 'over_loaded':
                         $recommendation['recommendations'][] = 'Consider redistributing some tasks';
-                        $recommendation['recommendations'][] = 'Overload by: ' . ($workload->workload_percentage - 100) . '%';
+                        $recommendation['recommendations'][] = 'Overload by: '.($workload->workload_percentage - 100).'%';
                         break;
                     case 'critical':
                         $recommendation['recommendations'][] = 'Urgent: Redistribute tasks immediately';
-                        $recommendation['recommendations'][] = 'Critical overload: ' . ($workload->workload_percentage - 100) . '%';
+                        $recommendation['recommendations'][] = 'Critical overload: '.($workload->workload_percentage - 100).'%';
                         break;
                     case 'optimal':
                         $recommendation['recommendations'][] = 'Workload is well balanced';
@@ -1469,7 +1538,7 @@ class DepartmentManagerController extends Controller
             return $this->ok('Workload recommendations retrieved successfully', $recommendations);
 
         } catch (Throwable $e) {
-            return $this->fail('Error retrieving workload recommendations: ' . $e->getMessage(), 500);
+            return $this->fail('Error retrieving workload recommendations: '.$e->getMessage(), 500);
         }
     }
 
@@ -1481,7 +1550,7 @@ class DepartmentManagerController extends Controller
     public function getProgressOverview(Request $request): JsonResponse
     {
         try {
-            if (!$this->isDepartmentManager()) {
+            if (! $this->isDepartmentManager()) {
                 return $this->fail('Access denied. Department manager role required.', 403);
             }
 
@@ -1509,7 +1578,7 @@ class DepartmentManagerController extends Controller
             return $this->ok('Progress overview retrieved successfully', $overview);
 
         } catch (Throwable $e) {
-            return $this->fail('Error retrieving progress overview: ' . $e->getMessage(), 500);
+            return $this->fail('Error retrieving progress overview: '.$e->getMessage(), 500);
         }
     }
 
@@ -1519,7 +1588,7 @@ class DepartmentManagerController extends Controller
     public function getDepartmentPerformance(Request $request): JsonResponse
     {
         try {
-            if (!$this->isDepartmentManager()) {
+            if (! $this->isDepartmentManager()) {
                 return $this->fail('Access denied. Department manager role required.', 403);
             }
 
@@ -1558,7 +1627,7 @@ class DepartmentManagerController extends Controller
             return $this->ok('Department performance retrieved successfully', $performance);
 
         } catch (Throwable $e) {
-            return $this->fail('Error retrieving department performance: ' . $e->getMessage(), 500);
+            return $this->fail('Error retrieving department performance: '.$e->getMessage(), 500);
         }
     }
 
@@ -1568,7 +1637,7 @@ class DepartmentManagerController extends Controller
     public function getEmployeeProductivity($employeeId): JsonResponse
     {
         try {
-            if (!$this->isDepartmentManager()) {
+            if (! $this->isDepartmentManager()) {
                 return $this->fail('Access denied. Department manager role required.', 403);
             }
 
@@ -1617,7 +1686,7 @@ class DepartmentManagerController extends Controller
             return $this->ok('Employee productivity retrieved successfully', $productivity);
 
         } catch (Throwable $e) {
-            return $this->fail('Error retrieving employee productivity: ' . $e->getMessage(), 500);
+            return $this->fail('Error retrieving employee productivity: '.$e->getMessage(), 500);
         }
     }
 
@@ -1627,7 +1696,7 @@ class DepartmentManagerController extends Controller
     public function getTaskCompletionTrends(Request $request): JsonResponse
     {
         try {
-            if (!$this->isDepartmentManager()) {
+            if (! $this->isDepartmentManager()) {
                 return $this->fail('Access denied. Department manager role required.', 403);
             }
 
@@ -1660,7 +1729,7 @@ class DepartmentManagerController extends Controller
             return $this->ok('Task completion trends retrieved successfully', $trends);
 
         } catch (Throwable $e) {
-            return $this->fail('Error retrieving task completion trends: ' . $e->getMessage(), 500);
+            return $this->fail('Error retrieving task completion trends: '.$e->getMessage(), 500);
         }
     }
 
@@ -1670,7 +1739,7 @@ class DepartmentManagerController extends Controller
     public function exportDepartmentReport(Request $request): JsonResponse
     {
         try {
-            if (!$this->isDepartmentManager()) {
+            if (! $this->isDepartmentManager()) {
                 return $this->fail('Access denied. Department manager role required.', 403);
             }
 
@@ -1697,7 +1766,7 @@ class DepartmentManagerController extends Controller
             return $this->ok('Department report generated successfully', $report);
 
         } catch (Throwable $e) {
-            return $this->fail('Error generating department report: ' . $e->getMessage(), 500);
+            return $this->fail('Error generating department report: '.$e->getMessage(), 500);
         }
     }
 }

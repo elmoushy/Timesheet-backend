@@ -3,11 +3,11 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
-use App\Models\PersonalTask;
-use App\Models\ProjectTask;
 use App\Models\AssignedTask;
 use App\Models\EmployeeProductivityAnalytics;
-use App\Models\ProjectEmployeeAssignment; // Import the model
+use App\Models\PersonalTask;
+use App\Models\ProjectEmployeeAssignment;
+use App\Models\ProjectTask; // Import the model
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -37,7 +37,7 @@ class TimeManagementController extends Controller
     {
         try {
             $employee = Auth::user();
-            if (!$employee) {
+            if (! $employee) {
                 return $this->fail('Unauthorized access', 401);
             }
 
@@ -89,13 +89,13 @@ class TimeManagementController extends Controller
                     'completed_today' => $this->getCompletedTasksToday($employee->id),
                     'overdue_tasks' => $this->getOverdueTasks($employee->id),
                     'due_this_week' => $this->getDueThisWeek($employee->id),
-                ]
+                ],
             ];
 
             return $this->ok('Employee dashboard retrieved successfully', $dashboard);
 
         } catch (Throwable $e) {
-            return $this->fail('Error retrieving dashboard: ' . $e->getMessage(), 500);
+            return $this->fail('Error retrieving dashboard: '.$e->getMessage(), 500);
         }
     }
 
@@ -124,13 +124,13 @@ class TimeManagementController extends Controller
             }
 
             $tasks = $query->orderBy('is_pinned', 'desc')
-                          ->orderBy('due_date', 'asc')
-                          ->get();
+                ->orderBy('due_date', 'asc')
+                ->get();
 
             return $this->ok('Personal tasks retrieved successfully', $tasks);
 
         } catch (Throwable $e) {
-            return $this->fail('Error retrieving personal tasks: ' . $e->getMessage(), 500);
+            return $this->fail('Error retrieving personal tasks: '.$e->getMessage(), 500);
         }
     }
 
@@ -169,7 +169,7 @@ class TimeManagementController extends Controller
             return $this->ok('Personal task created successfully', $task);
 
         } catch (Throwable $e) {
-            return $this->fail('Error creating personal task: ' . $e->getMessage(), 500);
+            return $this->fail('Error creating personal task: '.$e->getMessage(), 500);
         }
     }
 
@@ -199,7 +199,7 @@ class TimeManagementController extends Controller
             $employee = Auth::user();
 
             $task = PersonalTask::where('employee_id', $employee->id)->find($id);
-            if (!$task) {
+            if (! $task) {
                 return $this->fail('Task not found', 404);
             }
 
@@ -207,7 +207,7 @@ class TimeManagementController extends Controller
             $task->update($request->only([
                 'title', 'description', 'status', 'progress_points',
                 'due_date', 'estimated_hours', 'actual_hours', 'notes',
-                'is_important', 'is_pinned'
+                'is_important', 'is_pinned',
             ]));
 
             // Log status change if status changed
@@ -223,7 +223,7 @@ class TimeManagementController extends Controller
             return $this->ok('Personal task updated successfully', $task);
 
         } catch (Throwable $e) {
-            return $this->fail('Error updating personal task: ' . $e->getMessage(), 500);
+            return $this->fail('Error updating personal task: '.$e->getMessage(), 500);
         }
     }
 
@@ -244,7 +244,7 @@ class TimeManagementController extends Controller
     {
         try {
             $employee = Auth::user();
-            if (!$employee) {
+            if (! $employee) {
                 return $this->fail('Unauthorized access', 401);
             }
 
@@ -260,13 +260,13 @@ class TimeManagementController extends Controller
                 'total_hours_logged' => $analytics->sum('hours_logged'),
                 'average_daily_tasks' => round($analytics->avg('tasks_completed'), 2),
                 'productivity_trend' => $this->calculateProductivityTrend($analytics),
-                'daily_data' => $analytics->reverse()->values()
+                'daily_data' => $analytics->reverse()->values(),
             ];
 
             return $this->ok('Analytics retrieved successfully', $summary);
 
         } catch (Throwable $e) {
-            return $this->fail('Error retrieving analytics: ' . $e->getMessage(), 500);
+            return $this->fail('Error retrieving analytics: '.$e->getMessage(), 500);
         }
     }
 
@@ -277,7 +277,7 @@ class TimeManagementController extends Controller
     {
         try {
             $employee = Auth::user();
-            if (!$employee) {
+            if (! $employee) {
                 return $this->fail('Unauthorized access', 401);
             }
 
@@ -305,13 +305,13 @@ class TimeManagementController extends Controller
                 'personal' => $personalTasks,
                 'project' => $projectTasks,
                 'assigned' => $assignedTasks,
-                'total_count' => $personalTasks->count() + $projectTasks->count() + $assignedTasks->count()
+                'total_count' => $personalTasks->count() + $projectTasks->count() + $assignedTasks->count(),
             ];
 
             return $this->ok('Important tasks retrieved successfully', $importantTasks);
 
         } catch (Throwable $e) {
-            return $this->fail('Error retrieving important tasks: ' . $e->getMessage(), 500);
+            return $this->fail('Error retrieving important tasks: '.$e->getMessage(), 500);
         }
     }
 
@@ -334,7 +334,7 @@ class TimeManagementController extends Controller
             $employee = Auth::user();
 
             $task = PersonalTask::where('employee_id', $employee->id)->find($id);
-            if (!$task) {
+            if (! $task) {
                 return $this->fail('Personal task not found or unauthorized', 404);
             }
 
@@ -346,7 +346,7 @@ class TimeManagementController extends Controller
             return $this->ok('Personal task deleted successfully');
 
         } catch (Throwable $e) {
-            return $this->fail('Error deleting personal task: ' . $e->getMessage(), 500);
+            return $this->fail('Error deleting personal task: '.$e->getMessage(), 500);
         }
     }
 
@@ -370,7 +370,7 @@ class TimeManagementController extends Controller
             $employee = Auth::user();
 
             $task = PersonalTask::where('employee_id', $employee->id)->find($id);
-            if (!$task) {
+            if (! $task) {
                 return $this->fail('Personal task not found or unauthorized', 404);
             }
 
@@ -401,7 +401,7 @@ class TimeManagementController extends Controller
             return $this->ok('Personal task status updated successfully', $task);
 
         } catch (Throwable $e) {
-            return $this->fail('Error updating personal task status: ' . $e->getMessage(), 500);
+            return $this->fail('Error updating personal task status: '.$e->getMessage(), 500);
         }
     }
 
@@ -409,7 +409,7 @@ class TimeManagementController extends Controller
     {
         try {
             $employee = Auth::user();
-            if (!$employee) {
+            if (! $employee) {
                 return $this->fail('Unauthorized access', 401);
             }
 
@@ -435,7 +435,7 @@ class TimeManagementController extends Controller
 
             return $this->ok('Project assignments retrieved successfully', $assignments);
         } catch (Throwable $e) {
-            return $this->fail('Error retrieving project assignments: ' . $e->getMessage(), 500);
+            return $this->fail('Error retrieving project assignments: '.$e->getMessage(), 500);
         }
     }
     /* ─────────────────────  Project Tasks  ───────────────────── */
@@ -456,19 +456,19 @@ class TimeManagementController extends Controller
             }
 
             if ($request->has('project_id')) {
-                $query->whereHas('projectAssignment', function($q) use ($request) {
+                $query->whereHas('projectAssignment', function ($q) use ($request) {
                     $q->where('project_id', $request->project_id);
                 });
             }
 
             $tasks = $query->orderBy('is_pinned', 'desc')
-                          ->orderBy('due_date', 'asc')
-                          ->get();
+                ->orderBy('due_date', 'asc')
+                ->get();
 
             return $this->ok('Project tasks retrieved successfully', $tasks);
 
         } catch (Throwable $e) {
-            return $this->fail('Error retrieving project tasks: ' . $e->getMessage(), 500);
+            return $this->fail('Error retrieving project tasks: '.$e->getMessage(), 500);
         }
     }
 
@@ -505,7 +505,7 @@ class TimeManagementController extends Controller
                     ->lockForUpdate()
                     ->first();
 
-                if (!$assignment) {
+                if (! $assignment) {
                     throw new \Exception('Invalid or unauthorized project assignment');
                 }
 
@@ -516,7 +516,6 @@ class TimeManagementController extends Controller
                     ->where('auto_generated', false)
                     ->lockForUpdate()
                     ->first();
-
 
                 return ProjectTask::create([
                     'employee_id' => $employee->id,
@@ -543,7 +542,7 @@ class TimeManagementController extends Controller
             return $this->ok('Project task created successfully', $task);
 
         } catch (Throwable $e) {
-            return $this->fail('Error creating project task: ' . $e->getMessage(), 500);
+            return $this->fail('Error creating project task: '.$e->getMessage(), 500);
         }
     }
 
@@ -573,7 +572,7 @@ class TimeManagementController extends Controller
             $employee = Auth::user();
 
             $task = ProjectTask::where('employee_id', $employee->id)->find($id);
-            if (!$task) {
+            if (! $task) {
                 return $this->fail('Project task not found or unauthorized', 404);
             }
 
@@ -583,7 +582,7 @@ class TimeManagementController extends Controller
             $task->update($request->only([
                 'title', 'description', 'status', 'due_date',
                 'estimated_hours', 'actual_hours', 'notes',
-                'is_important', 'is_pinned', 'progress_points'
+                'is_important', 'is_pinned', 'progress_points',
             ]));
 
             // Log status change if status changed
@@ -602,7 +601,7 @@ class TimeManagementController extends Controller
             return $this->ok('Project task updated successfully', $task->fresh());
 
         } catch (Throwable $e) {
-            return $this->fail('Error updating project task: ' . $e->getMessage(), 500);
+            return $this->fail('Error updating project task: '.$e->getMessage(), 500);
         }
     }
 
@@ -631,7 +630,7 @@ class TimeManagementController extends Controller
             $employee = Auth::user();
 
             $task = ProjectTask::where('employee_id', $employee->id)->find($id);
-            if (!$task) {
+            if (! $task) {
                 return $this->fail('Project task not found or unauthorized', 404);
             }
 
@@ -683,7 +682,7 @@ class TimeManagementController extends Controller
             return $this->ok('Project task status updated successfully', $task);
 
         } catch (Throwable $e) {
-            return $this->fail('Error updating project task status: ' . $e->getMessage(), 500);
+            return $this->fail('Error updating project task status: '.$e->getMessage(), 500);
         }
     }
 
@@ -706,7 +705,7 @@ class TimeManagementController extends Controller
             $employee = Auth::user();
 
             $task = ProjectTask::where('employee_id', $employee->id)->find($id);
-            if (!$task) {
+            if (! $task) {
                 return $this->fail('Project task not found or unauthorized', 404);
             }
 
@@ -724,11 +723,44 @@ class TimeManagementController extends Controller
                 'task_id' => $id,
                 'hours_logged' => $request->hours,
                 'total_actual_hours' => $task->actual_hours,
-                'date' => $request->date ?? now()->toDateString()
+                'date' => $request->date ?? now()->toDateString(),
             ]);
 
         } catch (Throwable $e) {
-            return $this->fail('Error logging time: ' . $e->getMessage(), 500);
+            return $this->fail('Error logging time: '.$e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Delete a project task
+     */
+    public function deleteProjectTask(Request $request, int $id): JsonResponse
+    {
+        try {
+            $employee = Auth::user();
+
+            // First check if task exists at all
+            $taskExists = ProjectTask::find($id);
+            if (! $taskExists) {
+                return $this->fail('Project task with ID '.$id.' does not exist', 404);
+            }
+
+            // Check if task belongs to the authenticated user
+            $task = ProjectTask::where('employee_id', $employee->id)->find($id);
+            if (! $task) {
+                return $this->fail('Project task not found or you are not authorized to delete this task (belongs to employee ID: '.$taskExists->employee_id.', your ID: '.$employee->id.')', 403);
+            }
+
+            // Log activity before deleting
+            $this->logTaskActivity('project', $id, $employee->id, 'deleted');
+            
+            // Delete the task
+            $task->delete();
+
+            return $this->ok('Project task deleted successfully');
+
+        } catch (Throwable $e) {
+            return $this->fail('Error deleting project task: '.$e->getMessage(), 500);
         }
     }
 
@@ -754,13 +786,13 @@ class TimeManagementController extends Controller
             }
 
             $tasks = $query->orderBy('is_pinned', 'desc')
-                          ->orderBy('due_date', 'asc')
-                          ->get();
+                ->orderBy('due_date', 'asc')
+                ->get();
 
             return $this->ok('Assigned tasks retrieved successfully', $tasks);
 
         } catch (Throwable $e) {
-            return $this->fail('Error retrieving assigned tasks: ' . $e->getMessage(), 500);
+            return $this->fail('Error retrieving assigned tasks: '.$e->getMessage(), 500);
         }
     }
 
@@ -784,7 +816,7 @@ class TimeManagementController extends Controller
             $employee = Auth::user();
 
             $task = AssignedTask::where('assigned_to', $employee->id)->find($id);
-            if (!$task) {
+            if (! $task) {
                 return $this->fail('Assigned task not found or unauthorized', 404);
             }
 
@@ -820,7 +852,7 @@ class TimeManagementController extends Controller
             return $this->ok('Assigned task status updated successfully', $task);
 
         } catch (Throwable $e) {
-            return $this->fail('Error updating assigned task status: ' . $e->getMessage(), 500);
+            return $this->fail('Error updating assigned task status: '.$e->getMessage(), 500);
         }
     }
 
@@ -842,7 +874,7 @@ class TimeManagementController extends Controller
             $employee = Auth::user();
 
             $task = AssignedTask::where('assigned_to', $employee->id)->find($id);
-            if (!$task) {
+            if (! $task) {
                 return $this->fail('Assigned task not found or unauthorized', 404);
             }
 
@@ -861,11 +893,105 @@ class TimeManagementController extends Controller
                 'task_id' => $id,
                 'feedback' => $request->feedback,
                 'rating' => $request->rating,
-                'submitted_at' => $task->feedback_submitted_at
+                'submitted_at' => $task->feedback_submitted_at,
             ]);
 
         } catch (Throwable $e) {
-            return $this->fail('Error submitting task feedback: ' . $e->getMessage(), 500);
+            return $this->fail('Error submitting task feedback: '.$e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Update assigned task flags (pin/important)
+     */
+    public function updateAssignedTask(Request $request, int $id): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'is_pinned' => 'sometimes|boolean',
+            'is_important' => 'sometimes|boolean',
+            'notes' => 'sometimes|nullable|string',
+            'progress_points' => 'sometimes|integer|min:0|max:100',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->fail($validator->errors()->first(), 422);
+        }
+
+        try {
+            $employee = Auth::user();
+
+            $task = AssignedTask::where('assigned_to', $employee->id)->find($id);
+            if (! $task) {
+                return $this->fail('Assigned task not found or unauthorized', 404);
+            }
+
+            // Check permissions
+            if ($task->permission_level === 'view_only') {
+                return $this->fail('You do not have permission to edit this task', 403);
+            }
+
+            // Update only the fields that were provided
+            $task->update($request->only([
+                'is_pinned', 'is_important', 'notes', 'progress_points',
+            ]));
+
+            // Log activity
+            $this->logTaskActivity('assigned', $id, $employee->id, 'updated');
+
+            return $this->ok('Assigned task updated successfully', $task->fresh());
+
+        } catch (Throwable $e) {
+            return $this->fail('Error updating assigned task: '.$e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Log time spent on assigned task
+     */
+    public function logAssignedTaskTimeSpent(Request $request, int $id): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'hours' => 'required|numeric|min:0.1|max:24',
+            'date' => 'nullable|date',
+            'description' => 'nullable|string|max:500',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->fail($validator->errors()->first(), 422);
+        }
+
+        try {
+            $employee = Auth::user();
+
+            $task = AssignedTask::where('assigned_to', $employee->id)->find($id);
+            if (! $task) {
+                return $this->fail('Assigned task not found or unauthorized', 404);
+            }
+
+            // Check permissions
+            if ($task->permission_level === 'view_only') {
+                return $this->fail('You do not have permission to log time for this task', 403);
+            }
+
+            // Update actual hours
+            $task->actual_hours = ($task->actual_hours ?? 0) + $request->hours;
+            $task->save();
+
+            // Update analytics
+            $this->updateAnalytics($employee->id, 'hours_logged', $request->hours);
+
+            // Log activity
+            $this->logTaskActivity('assigned', $id, $employee->id, 'time_logged', 'actual_hours', null, $request->hours);
+
+            return $this->ok('Time logged successfully', [
+                'task_id' => $id,
+                'hours_logged' => $request->hours,
+                'total_actual_hours' => $task->actual_hours,
+                'date' => $request->date ?? now()->toDateString(),
+            ]);
+
+        } catch (Throwable $e) {
+            return $this->fail('Error logging time: '.$e->getMessage(), 500);
         }
     }
 
@@ -893,19 +1019,42 @@ class TimeManagementController extends Controller
     {
         $today = now()->toDateString();
 
-        $analytics = EmployeeProductivityAnalytics::firstOrCreate(
-            ['employee_id' => $employeeId, 'date' => $today],
-            ['tasks_completed' => 0, 'tasks_created' => 0, 'total_progress_points' => 0, 'hours_logged' => 0]
-        );
+        try {
+            $analytics = EmployeeProductivityAnalytics::firstOrCreate(
+                ['employee_id' => $employeeId, 'date' => $today],
+                ['tasks_completed' => 0, 'tasks_created' => 0, 'total_progress_points' => 0, 'hours_logged' => 0]
+            );
 
-        if ($action === 'task_completed') {
-            $analytics->increment('tasks_completed');
-            $this->updateStreak($employeeId);
-        } elseif ($action === 'task_created') {
-            $analytics->increment('tasks_created');
-        } elseif ($action === 'hours_logged' && $hours) {
-            $analytics->hours_logged += $hours;
-            $analytics->save();
+            if ($action === 'task_completed') {
+                $analytics->increment('tasks_completed');
+                $this->updateStreak($employeeId);
+            } elseif ($action === 'task_created') {
+                $analytics->increment('tasks_created');
+            } elseif ($action === 'hours_logged' && $hours) {
+                $analytics->hours_logged += $hours;
+                $analytics->save();
+            }
+        } catch (\Illuminate\Database\QueryException $e) {
+            // Handle race condition - try to find and update existing record
+            if ($e->getCode() == 23000) { // UNIQUE constraint violation
+                $analytics = EmployeeProductivityAnalytics::where('employee_id', $employeeId)
+                    ->where('date', $today)
+                    ->first();
+                
+                if ($analytics) {
+                    if ($action === 'task_completed') {
+                        $analytics->increment('tasks_completed');
+                        $this->updateStreak($employeeId);
+                    } elseif ($action === 'task_created') {
+                        $analytics->increment('tasks_created');
+                    } elseif ($action === 'hours_logged' && $hours) {
+                        $analytics->hours_logged += $hours;
+                        $analytics->save();
+                    }
+                }
+            } else {
+                throw $e; // Re-throw if it's a different error
+            }
         }
     }
 
@@ -981,16 +1130,36 @@ class TimeManagementController extends Controller
     {
         $today = now()->toDateString();
 
-        $analytics = EmployeeProductivityAnalytics::firstOrCreate(
-            ['employee_id' => $employeeId, 'date' => $today],
-            ['tasks_completed' => 0, 'tasks_created' => 0, 'total_progress_points' => 0, 'hours_logged' => 0]
-        );
+        try {
+            $analytics = EmployeeProductivityAnalytics::firstOrCreate(
+                ['employee_id' => $employeeId, 'date' => $today],
+                ['tasks_completed' => 0, 'tasks_created' => 0, 'total_progress_points' => 0, 'hours_logged' => 0]
+            );
 
-        if ($action === 'task_completed') {
-            $analytics->increment('tasks_completed');
-            $this->updateStreak($employeeId);
-        } elseif ($action === 'task_created') {
-            $analytics->increment('tasks_created');
+            if ($action === 'task_completed') {
+                $analytics->increment('tasks_completed');
+                $this->updateStreak($employeeId);
+            } elseif ($action === 'task_created') {
+                $analytics->increment('tasks_created');
+            }
+        } catch (\Illuminate\Database\QueryException $e) {
+            // Handle race condition - try to find and update existing record
+            if ($e->getCode() == 23000) { // UNIQUE constraint violation
+                $analytics = EmployeeProductivityAnalytics::where('employee_id', $employeeId)
+                    ->where('date', $today)
+                    ->first();
+                
+                if ($analytics) {
+                    if ($action === 'task_completed') {
+                        $analytics->increment('tasks_completed');
+                        $this->updateStreak($employeeId);
+                    } elseif ($action === 'task_created') {
+                        $analytics->increment('tasks_created');
+                    }
+                }
+            } else {
+                throw $e; // Re-throw if it's a different error
+            }
         }
     }
 

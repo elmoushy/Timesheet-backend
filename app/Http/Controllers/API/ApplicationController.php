@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
@@ -31,7 +32,7 @@ class ApplicationController extends Controller
                 'required',
                 'string',
                 'max:255',
-                $id > 0 ? Rule::unique('xxx_applications', 'name')->ignore($id) : Rule::unique('xxx_applications', 'name')
+                $id > 0 ? Rule::unique('xxx_applications', 'name')->ignore($id) : Rule::unique('xxx_applications', 'name'),
             ],
             'department_id' => 'nullable|integer|exists:xxx_departments,id',
             'employees' => 'sometimes|array',
@@ -46,8 +47,8 @@ class ApplicationController extends Controller
 
         // Apply search filters if provided
         if ($request->has('search')) {
-            $searchTerm = '%' . $request->input('search') . '%';
-            $query->where(function($q) use ($searchTerm) {
+            $searchTerm = '%'.$request->input('search').'%';
+            $query->where(function ($q) use ($searchTerm) {
                 $q->where('name', 'LIKE', $searchTerm);
             });
         }
@@ -67,6 +68,7 @@ class ApplicationController extends Controller
     {
         // Return all applications for dropdown/select lists (no pagination)
         $applications = Application::select('id', 'name')->orderBy('name')->get();
+
         return $this->ok('All applications fetched successfully', $applications);
     }
 
@@ -80,7 +82,7 @@ class ApplicationController extends Controller
 
         // Apply filters if provided
         if ($request->has('term')) {
-            $searchTerm = '%' . $request->input('term') . '%';
+            $searchTerm = '%'.$request->input('term').'%';
             $query->where('name', 'LIKE', $searchTerm);
         }
 
@@ -88,11 +90,11 @@ class ApplicationController extends Controller
         $results = $query->get();
 
         // Format results for dropdown with display text and value
-        $formattedResults = $results->map(function($department) {
+        $formattedResults = $results->map(function ($department) {
             return [
                 'id' => $department->id,
                 'name' => $department->name,
-                'display_text' => $department->name
+                'display_text' => $department->name,
             ];
         });
 
@@ -103,6 +105,7 @@ class ApplicationController extends Controller
     public function show($id): JsonResponse
     {
         $application = Application::with(['department', 'employees'])->find($id);
+
         return $application
             ? $this->ok('Application fetched successfully', $application)
             : $this->fail('Application not found', 404);
@@ -119,7 +122,7 @@ class ApplicationController extends Controller
         try {
             // Create application
             $application = Application::create($request->only([
-                'name', 'department_id'
+                'name', 'department_id',
             ]));
 
             // Sync employees if provided
@@ -133,7 +136,7 @@ class ApplicationController extends Controller
                 201
             );
         } catch (Throwable $e) {
-            return $this->fail('Error creating application: ' . $e->getMessage(), 500);
+            return $this->fail('Error creating application: '.$e->getMessage(), 500);
         }
     }
 
@@ -141,7 +144,7 @@ class ApplicationController extends Controller
     public function update(Request $request, $id): JsonResponse
     {
         $application = Application::find($id);
-        if (!$application) {
+        if (! $application) {
             return $this->fail('Application not found', 404);
         }
 
@@ -153,7 +156,7 @@ class ApplicationController extends Controller
         try {
             // Update application
             $application->update($request->only([
-                'name', 'department_id'
+                'name', 'department_id',
             ]));
 
             // Sync employees if provided
@@ -166,7 +169,7 @@ class ApplicationController extends Controller
                 $application->load(['department', 'employees'])
             );
         } catch (Throwable $e) {
-            return $this->fail('Error updating application: ' . $e->getMessage(), 500);
+            return $this->fail('Error updating application: '.$e->getMessage(), 500);
         }
     }
 
@@ -174,7 +177,7 @@ class ApplicationController extends Controller
     public function destroy($id): JsonResponse
     {
         $application = Application::find($id);
-        if (!$application) {
+        if (! $application) {
             return $this->fail('Application not found', 404);
         }
 
@@ -184,16 +187,17 @@ class ApplicationController extends Controller
 
             // Delete the application
             $application->delete();
+
             return $this->ok('Application deleted successfully');
         } catch (Throwable $e) {
-            return $this->fail('Error deleting application: ' . $e->getMessage(), 500);
+            return $this->fail('Error deleting application: '.$e->getMessage(), 500);
         }
     }
 
     public function bulkDestroy(Request $request): JsonResponse
     {
         $ids = $request->input('ids', []);
-        if (!is_array($ids) || empty($ids)) {
+        if (! is_array($ids) || empty($ids)) {
             return $this->fail('ids must be a non-empty array', 422);
         }
 
@@ -204,12 +208,13 @@ class ApplicationController extends Controller
             }
 
             $deleted = Application::whereIn('id', $ids)->delete();
+
             return $this->ok($deleted
                 ? "$deleted application(s) deleted successfully"
                 : 'No applications were deleted'
             );
         } catch (Throwable $e) {
-            return $this->fail('Error deleting applications: ' . $e->getMessage(), 500);
+            return $this->fail('Error deleting applications: '.$e->getMessage(), 500);
         }
     }
 
@@ -221,7 +226,7 @@ class ApplicationController extends Controller
 
         // Apply filters if provided
         if ($request->has('term')) {
-            $searchTerm = '%' . $request->input('term') . '%';
+            $searchTerm = '%'.$request->input('term').'%';
             $query->where('name', 'LIKE', $searchTerm);
         }
 
@@ -234,11 +239,11 @@ class ApplicationController extends Controller
         $results = $query->limit(50)->get();
 
         // Format results for dropdown with display text and value
-        $formattedResults = $results->map(function($application) {
+        $formattedResults = $results->map(function ($application) {
             return [
                 'id' => $application->id,
                 'name' => $application->name,
-                'display_text' => $application->name
+                'display_text' => $application->name,
             ];
         });
 

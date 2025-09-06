@@ -14,7 +14,7 @@ class PageRolePermission extends Model
     protected $fillable = [
         'page_id',
         'role_id',
-        'is_active'
+        'is_active',
     ];
 
     protected $casts = [

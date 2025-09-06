@@ -22,14 +22,13 @@ return new class extends Migration
             $table->timestamps();
 
             $table->foreign('employee_id', 'fk_analytics_emp')
-                  ->references('id')->on('xxx_employees')
-                  ->onDelete('cascade');
+                ->references('id')->on('xxx_employees')
+                ->onDelete('cascade');
 
             // Unique constraint to prevent duplicate entries per employee per day
             $table->unique(['employee_id', 'date'], 'uk_employee_analytics_date');
 
             // Indexes
-            $table->index(['employee_id', 'date']);
             $table->index('date');
         });
     }

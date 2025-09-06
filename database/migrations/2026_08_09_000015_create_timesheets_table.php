@@ -16,13 +16,13 @@ return new class extends Migration
             $table->enum('overall_status', ['draft', 'in_review', 'approved', 'rejected', 'reopened']);
             $table->timestamp('submitted_at')->nullable();
             $table->timestamps();
-            
+
             $table->unique(['employee_id', 'period_start']);
-            
+
             $table->foreign('employee_id')
-                  ->references('id')
-                  ->on('xxx_employees')
-                  ->onDelete('cascade');
+                ->references('id')
+                ->on('xxx_employees')
+                ->onDelete('cascade');
         });
     }
 

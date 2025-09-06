@@ -99,11 +99,16 @@ return [
             'port' => env('DB_PORT', '1521'),
             'database' => env('DB_DATABASE', 'PROD'),
             'service_name' => env('DB_SERVICE_NAME', 'PROD'),
-            'username' => env('DB_USERNAME', 'timesheet'),
+            'username' => env('DB_USERNAME', 'APEX_PUBLIC_USER'),
             'password' => env('DB_PASSWORD', 'KgJyrx3$1'),
             'charset' => 'AL32UTF8',
             'prefix' => '',
             'prefix_indexes' => true,
+            'tns' => env('DB_HOST', '185.197.251.203').':'.env('DB_PORT', '1521').'/'.env('DB_DATABASE', 'PROD'),
+            'options' => [
+                'connection_timeout' => 60,
+                'command_timeout' => 60,
+            ],
         ],
 
     ],

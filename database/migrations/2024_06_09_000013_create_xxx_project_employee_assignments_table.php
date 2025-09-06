@@ -23,20 +23,20 @@ return new class extends Migration
             $table->unique(['project_id', 'employee_id'], 'uk_proj_emp_assignment');
 
             $table->foreign('project_id', 'fk_pea_proj')
-                  ->references('id')->on('xxx_projects')
-                  ->onDelete('cascade');
+                ->references('id')->on('xxx_projects')
+                ->onDelete('cascade');
 
             $table->foreign('employee_id', 'fk_pea_emp')
-                  ->references('id')->on('xxx_employees')
-                  ->onDelete('cascade');
+                ->references('id')->on('xxx_employees')
+                ->onDelete('cascade');
 
             $table->foreign('requested_by', 'fk_pea_req')
-                  ->references('id')->on('xxx_employees')
-                  ->onDelete('cascade');
+                ->references('id')->on('xxx_employees')
+                ->onDelete('cascade');
 
             $table->foreign('approved_by', 'fk_pea_appr')
-                  ->references('id')->on('xxx_employees')
-                  ->onDelete('set null');
+                ->references('id')->on('xxx_employees')
+                ->onDelete('set null');
         });
     }
 

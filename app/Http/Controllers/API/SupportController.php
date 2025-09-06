@@ -3,214 +3,202 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
-use App\Models\XxSupport;
+use App\Models\Employee;
 use App\Models\SupportImage;
+use App\Models\XxSupport;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Auth;
+use Throwable;
 
 class SupportController extends Controller
 {
+    /* ─────────────────────  Helpers  ───────────────────── */
+    private function ok(string $msg, $data = [], int $code = 200): JsonResponse
+    {
+        return response()->json(['message' => $msg, 'data' => $data], $code);
+    }
+
+    private function fail(string $msg, int $code = 400): JsonResponse
+    {
+        return response()->json(['message' => $msg, 'data' => []], $code);
+    }
+
     /**
      * Display a listing of support records with pagination.
-     *
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
      */
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
         try {
-            $perPage = $request->get('per_page', 10);
-            $employeeId = $request->get('employee_id');
-            $hasImage = $request->get('has_image');
-            $search = $request->get('search');
-            $includeImageData = $request->get('include_image_data', false);
+            $perPage = $request->input('per_page', 10);
+            $employeeId = $request->input('employee_id');
+            $hasImage = $request->input('has_image');
+            $search = $request->input('search');
+            $includeImageData = $request->input('include_image_data', false);
 
-            // Only load image relationship if specifically requested
-            $with = ['employee'];
-            if ($includeImageData) {
-                $with[] = 'supportImageWithData';
-            } else {
-                // Load only image metadata without actual image data
-                $with[] = 'supportImage';
-            }
+            $query = XxSupport::with([
+                'employee:id,employee_code,first_name,middle_name,last_name', // Limited employee fields
+                'supportImage:id,mime_type,size,original_name,created_at,updated_at',
+            ]);
 
-            $query = XxSupport::with($with);
-
-            // Filter by employee
+            // Apply filters
             if ($employeeId) {
-                $query->forEmployee($employeeId);
+                $query->where('employee_id', $employeeId);
             }
 
-            // Filter by image presence
-            if ($hasImage === 'true') {
-                $query->withImages();
-            } elseif ($hasImage === 'false') {
-                $query->withoutImages();
-            }
-
-            // Search in message
-            if ($search) {
-                $query->where('message', 'LIKE', '%' . $search . '%');
-            }
-
-            // Order by latest first
-            $query->orderBy('created_at', 'desc');
-
-            $supports = $query->paginate($perPage);
-
-            // Transform the collection to include image metadata
-            $supports->getCollection()->transform(function ($support) use ($includeImageData) {
-                if ($support->supportImage) {
-                    if ($includeImageData) {
-                        // Only include image data URI if explicitly requested
-                        $support->supportImage->image_url = $support->supportImage->getImageDataUri();
-                    } else {
-                        // Only include metadata
-                        $support->supportImage = $support->supportImage->getImageMetadata();
-                    }
+            if ($hasImage !== null) {
+                if ($hasImage === 'true' || $hasImage === '1') {
+                    $query->whereNotNull('support_image_id');
+                } else {
+                    $query->whereNull('support_image_id');
                 }
-                return $support;
-            });
+            }
 
-            return response()->json([
-                'message' => 'Support records fetched successfully',
-                'data' => $supports
-            ], 200, [], JSON_UNESCAPED_UNICODE);
+            if ($search) {
+                $query->where('message', 'like', '%'.$search.'%');
+            }
 
-        } catch (\Exception $e) {
-            Log::error('Error retrieving support records: ' . $e->getMessage());
-            return response()->json([
-                'message' => 'Error retrieving support records: ' . $e->getMessage(),
-                'data' => []
-            ], 500, [], JSON_UNESCAPED_UNICODE);
+            $supports = $query->latest()->paginate($perPage);
+
+            // Add image data if requested
+            if ($includeImageData) {
+                $supports->getCollection()->transform(function ($support) {
+                    if ($support->supportImage) {
+                        $support->supportImage->has_image = true;
+                        $support->supportImage->image_url = $support->supportImage->getImageUrl();
+                    }
+
+                    return $support;
+                });
+            } else {
+                $supports->getCollection()->transform(function ($support) {
+                    if ($support->supportImage) {
+                        $support->supportImage->has_image = true;
+                        $support->supportImage->makeHidden(['image_data']);
+                    }
+
+                    return $support;
+                });
+            }
+
+            return $this->ok('Support records fetched successfully', $supports);
+        } catch (Throwable $e) {
+            return $this->fail('Failed to fetch support records: '.$e->getMessage(), 500);
         }
     }
 
     /**
      * Display all support records without pagination.
-     *
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
      */
-    public function all(Request $request)
+    public function all(Request $request): JsonResponse
     {
         try {
-            $employeeId = $request->get('employee_id');
-            $search = $request->get('search');
+            $query = XxSupport::with([
+                'employee:id,employee_code,first_name,middle_name,last_name', // Limited employee fields
+                'supportImage:id,mime_type,size,original_name,created_at,updated_at',
+            ]);
 
-            $query = XxSupport::with(['employee', 'supportImage']);
+            $supports = $query->latest()->get();
 
-            // Filter by employee
-            if ($employeeId) {
-                $query->forEmployee($employeeId);
-            }
-
-            // Search in message
-            if ($search) {
-                $query->where('message', 'LIKE', '%' . $search . '%');
-            }
-
-            // Order by latest first
-            $query->orderBy('created_at', 'desc');
-
-            $supports = $query->get();
-
-            // Add image URL to each support record
+            // Add image indicators without full data
             $supports->transform(function ($support) {
                 if ($support->supportImage) {
-                    // Don't access image data, just ensure it's not accidentally included
-                    unset($support->supportImage->image); // Ensure raw image data is not included
+                    $support->supportImage->has_image = true;
+                    $support->supportImage->makeHidden(['image_data']);
                 }
+
                 return $support;
             });
 
-            return response()->json([
-                'message' => 'All support records fetched successfully',
-                'data' => $supports
-            ], 200, [], JSON_UNESCAPED_UNICODE);
+            return $this->ok('All support records fetched successfully', $supports);
+        } catch (Throwable $e) {
+            return $this->fail('Failed to fetch all support records: '.$e->getMessage(), 500);
+        }
+    }
 
-        } catch (\Exception $e) {
-            Log::error('Error retrieving all support records: ' . $e->getMessage());
-            return response()->json([
-                'message' => 'Error retrieving all support records: ' . $e->getMessage(),
-                'data' => []
-            ], 500, [], JSON_UNESCAPED_UNICODE);
+    /**
+     * Search support records.
+     */
+    public function search(Request $request): JsonResponse
+    {
+        try {
+            $search = $request->input('search', '');
+            $perPage = $request->input('per_page', 10);
+
+            $query = XxSupport::with([
+                'employee:id,employee_code,first_name,middle_name,last_name', // Limited employee fields
+                'supportImage:id,mime_type,size,original_name,created_at,updated_at',
+            ]);
+
+            if ($search) {
+                $query->where('message', 'like', '%'.$search.'%')
+                    ->orWhereHas('employee', function ($q) use ($search) {
+                        $q->where('first_name', 'like', '%'.$search.'%')
+                            ->orWhere('last_name', 'like', '%'.$search.'%')
+                            ->orWhere('employee_code', 'like', '%'.$search.'%');
+                    });
+            }
+
+            $supports = $query->latest()->paginate($perPage);
+
+            // Add image indicators without full data
+            $supports->getCollection()->transform(function ($support) {
+                if ($support->supportImage) {
+                    $support->supportImage->has_image = true;
+                    $support->supportImage->makeHidden(['image_data']);
+                }
+
+                return $support;
+            });
+
+            return $this->ok('Support records search completed', $supports);
+        } catch (Throwable $e) {
+            return $this->fail('Failed to search support records: '.$e->getMessage(), 500);
         }
     }
 
     /**
      * Display the specified support record.
-     *
-     * @param int $id
-     * @return \Illuminate\Http\JsonResponse
      */
-    public function show($id)
+    public function show(string $id): JsonResponse
     {
         try {
-            $support = XxSupport::with(['employee', 'supportImage'])->find($id);
+            $support = XxSupport::with([
+                'employee:id,employee_code,first_name,middle_name,last_name', // Limited employee fields only
+                'supportImage:id,mime_type,size,original_name,created_at,updated_at',
+            ])->find($id);
 
-            if (!$support) {
-                return response()->json([
-                    'message' => 'Support record not found',
-                    'data' => []
-                ], 404, [], JSON_UNESCAPED_UNICODE);
+            if (! $support) {
+                return $this->fail('Support record not found', 404);
             }
 
-            // Add image URL if exists
+            // Add image data if support image exists
             if ($support->supportImage) {
-                // Don't access image data, just ensure it's not accidentally included
-                unset($support->supportImage->image); // Ensure raw image data is not included
+                $support->supportImage->has_image = true;
+                $support->supportImage->image_url = $support->supportImage->getImageUrl();
             }
 
-            return response()->json([
-                'message' => 'Support record fetched successfully',
-                'data' => $support
-            ], 200, [], JSON_UNESCAPED_UNICODE);
-
-        } catch (\Exception $e) {
-            Log::error('Error retrieving support record: ' . $e->getMessage());
-            return response()->json([
-                'message' => 'Error retrieving support record: ' . $e->getMessage(),
-                'data' => []
-            ], 500, [], JSON_UNESCAPED_UNICODE);
+            return $this->ok('Support record fetched successfully', $support);
+        } catch (Throwable $e) {
+            return $this->fail('Failed to fetch support record: '.$e->getMessage(), 500);
         }
     }
 
     /**
      * Store a newly created support record.
-     *
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
      */
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         try {
-            // Temporarily increase memory limit for image processing
-            $originalMemoryLimit = ini_get('memory_limit');
-            ini_set('memory_limit', '256M');
-
-            // Get authenticated user
-            $user = Auth::user();
-            if (!$user) {
-                return response()->json([
-                    'message' => 'Unauthorized - user not authenticated',
-                    'data' => []
-                ], 401);
-            }
-
             $validator = Validator::make($request->all(), [
-                'message' => 'required|string',
-                'support_image' => 'nullable|file|image|mimes:jpeg,png,jpg,gif|max:10240', // 10MB max
+                'employee_id' => 'nullable|integer|exists:xxx_employees,id',
+                'message' => 'required|string|max:1000',
+                'image' => 'nullable|file|mimes:jpeg,png,jpg,gif|max:10240', // 10MB max
             ]);
 
             if ($validator->fails()) {
-                return response()->json([
-                    'message' => $validator->errors()->first(),
-                    'data' => []
-                ], 422);
+                return $this->fail('Validation failed: '.implode(', ', $validator->errors()->all()), 422);
             }
 
             DB::beginTransaction();
@@ -218,454 +206,206 @@ class SupportController extends Controller
             $supportImageId = null;
 
             // Handle image upload if provided
-            if ($request->hasFile('support_image')) {
-                $image = $request->file('support_image');
-
-                // Validate image
-                $imageData = file_get_contents($image->getPathname());
-                $imageInfo = getimagesize($image->getPathname());
-
-                if (!$imageInfo) {
-                    return response()->json([
-                        'message' => 'Invalid image data',
-                        'data' => []
-                    ], 422);
-                }
-
-                // Ensure we have valid binary data
-                if (!$imageData || strlen($imageData) === 0) {
-                    return response()->json([
-                        'message' => 'Empty image data',
-                        'data' => []
-                    ], 422);
-                }
-
-                // Create support image record
-                $supportImage = SupportImage::create([
-                    'image' => $imageData,
-                    'mime_type' => $imageInfo['mime'],
-                    'size' => strlen($imageData),
-                    'original_name' => $image->getClientOriginalName(),
-                ]);
-
+            if ($request->hasFile('image')) {
+                $supportImage = SupportImage::createFromUploadedFile($request->file('image'));
                 $supportImageId = $supportImage->id;
             }
 
-            // Create support record with authenticated user's ID
+            // Get employee ID from request or authenticated user
+            $employeeId = $request->employee_id ?? auth()->user()->id;
+
             $support = XxSupport::create([
-                'employee_id' => $user->id,
+                'employee_id' => $employeeId,
                 'message' => $request->message,
                 'support_image_id' => $supportImageId,
             ]);
 
-            // Load relationships with minimal data
-            $support->load(['employee', 'supportImage:id,mime_type,size,original_name,created_at,updated_at']);
-
-            // Transform supportImage to metadata only
-            if ($support->supportImage) {
-                $support->supportImage = $support->supportImage->getImageMetadata();
-            }
-
             DB::commit();
 
-            // Clean up memory
-            unset($imageData, $supportImage);
-            gc_collect_cycles();
+            // Load relationships with limited employee data
+            $support->load([
+                'employee:id,employee_code,first_name,middle_name,last_name',
+                'supportImage:id,mime_type,size,original_name,created_at,updated_at',
+            ]);
 
-            // Restore original memory limit
-            ini_set('memory_limit', $originalMemoryLimit);
-
-            return response()->json([
-                'message' => 'Support record created successfully',
-                'data' => $support
-            ], 201, [], JSON_UNESCAPED_UNICODE);
-
-        } catch (\Exception $e) {
-            DB::rollback();
-
-            // Restore original memory limit on error
-            if (isset($originalMemoryLimit)) {
-                ini_set('memory_limit', $originalMemoryLimit);
+            if ($support->supportImage) {
+                $support->supportImage->has_image = true;
+                $support->supportImage->image_url = $support->supportImage->getImageUrl();
             }
 
-            Log::error('Error creating support record: ' . $e->getMessage());
-            return response()->json([
-                'message' => 'Error creating support record: ' . $e->getMessage(),
-                'data' => []
-            ], 500, [], JSON_UNESCAPED_UNICODE);
+            return $this->ok('Support record created successfully', $support, 201);
+        } catch (Throwable $e) {
+            DB::rollBack();
+
+            return $this->fail('Failed to create support record: '.$e->getMessage(), 500);
         }
     }
 
     /**
      * Update the specified support record.
-     *
-     * @param Request $request
-     * @param int $id
-     * @return \Illuminate\Http\JsonResponse
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, string $id): JsonResponse
     {
         try {
-            // Get authenticated user
-            $user = Auth::user();
-            if (!$user) {
-                return response()->json([
-                    'message' => 'Unauthorized - user not authenticated',
-                    'data' => []
-                ], 401, [], JSON_UNESCAPED_UNICODE);
-            }
-
             $support = XxSupport::find($id);
-
-            if (!$support) {
-                return response()->json([
-                    'message' => 'Support record not found',
-                    'data' => []
-                ], 404, [], JSON_UNESCAPED_UNICODE);
-            }
-
-            // Check if the authenticated user owns this support record
-            if ($support->employee_id !== $user->id) {
-                return response()->json([
-                    'message' => 'Unauthorized - you can only update your own support records',
-                    'data' => []
-                ], 403, [], JSON_UNESCAPED_UNICODE);
+            if (! $support) {
+                return $this->fail('Support record not found', 404);
             }
 
             $validator = Validator::make($request->all(), [
-                'message' => 'sometimes|required|string',
-                'support_image' => 'nullable|file|image|mimes:jpeg,png,jpg,gif|max:10240', // 10MB max
+                'employee_id' => 'nullable|integer|exists:xxx_employees,id',
+                'message' => 'required|string|max:1000',
+                'image' => 'nullable|file|mimes:jpeg,png,jpg,gif|max:10240',
             ]);
 
             if ($validator->fails()) {
-                return response()->json([
-                    'message' => $validator->errors()->first(),
-                    'data' => []
-                ], 422, [], JSON_UNESCAPED_UNICODE);
+                return $this->fail('Validation failed: '.implode(', ', $validator->errors()->all()), 422);
             }
 
             DB::beginTransaction();
 
+            $supportImageId = $support->support_image_id;
+
             // Handle image upload if provided
-            if ($request->hasFile('support_image')) {
-                $image = $request->file('support_image');
-
-                // Validate image
-                $imageData = file_get_contents($image->getPathname());
-                $imageInfo = getimagesize($image->getPathname());
-
-                if (!$imageInfo) {
-                    return response()->json([
-                        'message' => 'Invalid image data',
-                        'data' => []
-                    ], 422, [], JSON_UNESCAPED_UNICODE);
-                }
-
+            if ($request->hasFile('image')) {
                 // Delete old image if exists
-                if ($support->support_image_id) {
-                    $oldImage = SupportImage::find($support->support_image_id);
+                if ($supportImageId) {
+                    $oldImage = SupportImage::find($supportImageId);
                     if ($oldImage) {
                         $oldImage->delete();
                     }
                 }
 
-                // Create new support image record
-                $supportImage = SupportImage::create([
-                    'image' => $imageData,
-                    'mime_type' => $imageInfo['mime'],
-                    'size' => strlen($imageData),
-                    'original_name' => $image->getClientOriginalName(),
-                ]);
-
-                $support->support_image_id = $supportImage->id;
+                $supportImage = SupportImage::createFromUploadedFile($request->file('image'));
+                $supportImageId = $supportImage->id;
             }
 
-            // Update support record (only message can be updated)
-            $support->update($request->only(['message']));
+            // Get employee ID from request or authenticated user
+            $employeeId = $request->employee_id ?? auth()->user()->id;
 
-            // Load relationships
-            $support->load(['employee', 'supportImage']);
-
-            // Remove raw image data from response
-            if ($support->supportImage) {
-                unset($support->supportImage->image);
-            }
+            $support->update([
+                'employee_id' => $employeeId,
+                'message' => $request->message,
+                'support_image_id' => $supportImageId,
+            ]);
 
             DB::commit();
 
-            return response()->json([
-                'message' => 'Support record updated successfully',
-                'data' => $support
-            ], 200, [], JSON_UNESCAPED_UNICODE);
+            // Load relationships with limited employee data
+            $support->load([
+                'employee:id,employee_code,first_name,middle_name,last_name',
+                'supportImage:id,mime_type,size,original_name,created_at,updated_at',
+            ]);
 
-        } catch (\Exception $e) {
-            DB::rollback();
-            Log::error('Error updating support record: ' . $e->getMessage());
-            return response()->json([
-                'message' => 'Error updating support record: ' . $e->getMessage(),
-                'data' => []
-            ], 500, [], JSON_UNESCAPED_UNICODE);
+            if ($support->supportImage) {
+                $support->supportImage->has_image = true;
+                $support->supportImage->image_url = $support->supportImage->getImageUrl();
+            }
+
+            return $this->ok('Support record updated successfully', $support);
+        } catch (Throwable $e) {
+            DB::rollBack();
+
+            return $this->fail('Failed to update support record: '.$e->getMessage(), 500);
         }
     }
 
     /**
      * Remove the specified support record.
-     *
-     * @param int $id
-     * @return \Illuminate\Http\JsonResponse
      */
-    public function destroy($id)
+    public function destroy(string $id): JsonResponse
     {
         try {
-            // Get authenticated user
-            $user = Auth::user();
-            if (!$user) {
-                return response()->json([
-                    'message' => 'Unauthorized - user not authenticated',
-                    'data' => []
-                ], 401, [], JSON_UNESCAPED_UNICODE);
-            }
-
             $support = XxSupport::find($id);
-
-            if (!$support) {
-                return response()->json([
-                    'message' => 'Support record not found',
-                    'data' => []
-                ], 404, [], JSON_UNESCAPED_UNICODE);
-            }
-
-            // Check if the authenticated user owns this support record
-            if ($support->employee_id !== $user->id) {
-                return response()->json([
-                    'message' => 'Unauthorized - you can only delete your own support records',
-                    'data' => []
-                ], 403, [], JSON_UNESCAPED_UNICODE);
+            if (! $support) {
+                return $this->fail('Support record not found', 404);
             }
 
             DB::beginTransaction();
 
             // Delete associated image if exists
             if ($support->support_image_id) {
-                $image = SupportImage::find($support->support_image_id);
-                if ($image) {
-                    $image->delete();
+                $supportImage = SupportImage::find($support->support_image_id);
+                if ($supportImage) {
+                    $supportImage->delete();
                 }
             }
 
-            // Delete support record
             $support->delete();
 
             DB::commit();
 
-            return response()->json([
-                'message' => 'Support record deleted successfully',
-                'data' => []
-            ], 200, [], JSON_UNESCAPED_UNICODE);
+            return $this->ok('Support record deleted successfully');
+        } catch (Throwable $e) {
+            DB::rollBack();
 
-        } catch (\Exception $e) {
-            DB::rollback();
-            Log::error('Error deleting support record: ' . $e->getMessage());
-            return response()->json([
-                'message' => 'Error deleting support record',
-                'data' => []
-            ], 500, [], JSON_UNESCAPED_UNICODE);
+            return $this->fail('Failed to delete support record: '.$e->getMessage(), 500);
         }
     }
 
     /**
      * Bulk delete support records.
-     *
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
      */
-    public function bulkDestroy(Request $request)
+    public function bulkDestroy(Request $request): JsonResponse
     {
         try {
-            // Get authenticated user
-            $user = Auth::user();
-            if (!$user) {
-                return response()->json([
-                    'message' => 'Unauthorized - user not authenticated',
-                    'data' => []
-                ], 401, [], JSON_UNESCAPED_UNICODE);
-            }
-
             $validator = Validator::make($request->all(), [
                 'ids' => 'required|array|min:1',
                 'ids.*' => 'integer|exists:xx_support,id',
             ]);
 
             if ($validator->fails()) {
-                return response()->json([
-                    'message' => $validator->errors()->first(),
-                    'data' => []
-                ], 422, [], JSON_UNESCAPED_UNICODE);
+                return $this->fail('Validation failed: '.implode(', ', $validator->errors()->all()), 422);
             }
 
             DB::beginTransaction();
 
-            // Only allow deletion of user's own support records
-            $supports = XxSupport::whereIn('id', $request->ids)
-                              ->where('employee_id', $user->id)
-                              ->get();
+            $supports = XxSupport::whereIn('id', $request->ids)->get();
+            $deletedCount = 0;
 
-            if ($supports->count() !== count($request->ids)) {
-                return response()->json([
-                    'message' => 'Unauthorized - you can only delete your own support records',
-                    'data' => []
-                ], 403, [], JSON_UNESCAPED_UNICODE);
+            foreach ($supports as $support) {
+                // Delete associated image if exists
+                if ($support->support_image_id) {
+                    $supportImage = SupportImage::find($support->support_image_id);
+                    if ($supportImage) {
+                        $supportImage->delete();
+                    }
+                }
+
+                $support->delete();
+                $deletedCount++;
             }
-
-            // Delete associated images
-            $imageIds = $supports->pluck('support_image_id')->filter();
-            if ($imageIds->isNotEmpty()) {
-                SupportImage::whereIn('id', $imageIds)->delete();
-            }
-
-            // Delete support records
-            $deletedCount = XxSupport::whereIn('id', $request->ids)
-                                   ->where('employee_id', $user->id)
-                                   ->delete();
 
             DB::commit();
 
-            return response()->json([
-                'message' => "{$deletedCount} support record(s) deleted successfully",
-                'data' => []
-            ], 200, [], JSON_UNESCAPED_UNICODE);
+            return $this->ok("Successfully deleted {$deletedCount} support records", ['deleted_count' => $deletedCount]);
+        } catch (Throwable $e) {
+            DB::rollBack();
 
-        } catch (\Exception $e) {
-            DB::rollback();
-            Log::error('Error deleting support records: ' . $e->getMessage());
-            return response()->json([
-                'message' => 'Error deleting support records',
-                'data' => []
-            ], 500, [], JSON_UNESCAPED_UNICODE);
-        }
-    }
-
-    /**
-     * Search support records.
-     *
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function search(Request $request)
-    {
-        try {
-            $term = $request->get('term', '');
-            $employeeId = $request->get('employee_id');
-
-            $query = XxSupport::with(['employee', 'supportImage']);
-
-            if ($term) {
-                $query->where('message', 'LIKE', '%' . $term . '%');
-            }
-
-            if ($employeeId) {
-                $query->forEmployee($employeeId);
-            }
-
-            $supports = $query->orderBy('created_at', 'desc')
-                           ->limit(20)
-                           ->get();
-
-            // Add image URL and format for display
-            $supports->transform(function ($support) {
-                if ($support->supportImage) {
-                    // Don't access image_url here as it would load the binary data
-                    // Only access has_image which is memory efficient
-                    $support->supportImage->has_image = $support->supportImage->has_image;
-                }
-
-                // Add display text for search results
-                $support->display_text = substr($support->message, 0, 100) .
-                                       (strlen($support->message) > 100 ? '...' : '');
-
-                return $support;
-            });
-
-            return response()->json([
-                'message' => 'Support search results',
-                'data' => $supports
-            ], 200, [], JSON_UNESCAPED_UNICODE);
-
-        } catch (\Exception $e) {
-            Log::error('Error searching support records: ' . $e->getMessage());
-            return response()->json([
-                'message' => 'Error searching support records: ' . $e->getMessage(),
-                'data' => []
-            ], 500, [], JSON_UNESCAPED_UNICODE);
+            return $this->fail('Failed to bulk delete support records: '.$e->getMessage(), 500);
         }
     }
 
     /**
      * Upload image for support record.
-     *
-     * @param Request $request
-     * @param int $id
-     * @return \Illuminate\Http\JsonResponse
      */
-    public function uploadImage(Request $request, $id)
+    public function uploadImage(Request $request, string $id): JsonResponse
     {
         try {
-            // Temporarily increase memory limit for image processing
-            $originalMemoryLimit = ini_get('memory_limit');
-            ini_set('memory_limit', '512M');
-
-            // Get authenticated user
-            $user = Auth::user();
-            if (!$user) {
-                ini_set('memory_limit', $originalMemoryLimit);
-                return response()->json([
-                    'message' => 'Unauthorized - user not authenticated',
-                    'data' => []
-                ], 401, [], JSON_UNESCAPED_UNICODE);
-            }
-
             $support = XxSupport::find($id);
-
-            if (!$support) {
-                return response()->json([
-                    'message' => 'Support record not found',
-                    'data' => []
-                ], 404, [], JSON_UNESCAPED_UNICODE);
-            }
-
-            // Check if the authenticated user owns this support record
-            if ($support->employee_id !== $user->id) {
-                return response()->json([
-                    'message' => 'Unauthorized - you can only upload images to your own support records',
-                    'data' => []
-                ], 403, [], JSON_UNESCAPED_UNICODE);
+            if (! $support) {
+                return $this->fail('Support record not found', 404);
             }
 
             $validator = Validator::make($request->all(), [
-                'support_image' => 'required|file|image|mimes:jpeg,png,jpg,gif|max:10240', // 10MB max
+                'image' => 'required|file|mimes:jpeg,png,jpg,gif|max:10240',
             ]);
 
             if ($validator->fails()) {
-                return response()->json([
-                    'message' => $validator->errors()->first(),
-                    'data' => []
-                ], 422, [], JSON_UNESCAPED_UNICODE);
+                return $this->fail('Validation failed: '.implode(', ', $validator->errors()->all()), 422);
             }
 
             DB::beginTransaction();
-
-            $image = $request->file('support_image');
-
-            // Validate image
-            $imageData = file_get_contents($image->getPathname());
-            $imageInfo = getimagesize($image->getPathname());
-
-            if (!$imageInfo) {
-                return response()->json([
-                    'message' => 'Invalid image data',
-                    'data' => []
-                ], 422, [], JSON_UNESCAPED_UNICODE);
-            }
 
             // Delete old image if exists
             if ($support->support_image_id) {
@@ -675,186 +415,79 @@ class SupportController extends Controller
                 }
             }
 
-            // Create new support image record
-            $supportImage = SupportImage::create([
-                'image' => $imageData,
-                'mime_type' => $imageInfo['mime'],
-                'size' => strlen($imageData),
-                'original_name' => $image->getClientOriginalName(),
-            ]);
-
-            // Update support record
-            $support->support_image_id = $supportImage->id;
-            $support->save();
+            $supportImage = SupportImage::createFromUploadedFile($request->file('image'));
+            $support->update(['support_image_id' => $supportImage->id]);
 
             DB::commit();
 
-            $responseData = [
-                'image_url' => $supportImage->image_url,
-                'has_image' => $supportImage->has_image,
-                'image_size' => $supportImage->size,
-                'mime_type' => $supportImage->mime_type,
-                'original_name' => $supportImage->original_name,
-            ];
+            return $this->ok('Image uploaded successfully', [
+                'image_id' => $supportImage->id,
+                'image_url' => $supportImage->getImageUrl(),
+            ]);
+        } catch (Throwable $e) {
+            DB::rollBack();
 
-            // Clean up memory
-            unset($support, $supportImage, $imageData);
-            gc_collect_cycles();
-            ini_set('memory_limit', $originalMemoryLimit);
-
-            return response()->json([
-                'message' => 'Support image uploaded successfully',
-                'data' => $responseData
-            ], 200, [], JSON_UNESCAPED_UNICODE);
-
-        } catch (\Exception $e) {
-            DB::rollback();
-            // Ensure memory limit is restored even on error
-            if (isset($originalMemoryLimit)) {
-                ini_set('memory_limit', $originalMemoryLimit);
-            }
-            Log::error('Error uploading support image: ' . $e->getMessage());
-            return response()->json([
-                'message' => 'Error uploading image: ' . $e->getMessage(),
-                'data' => []
-            ], 500, [], JSON_UNESCAPED_UNICODE);
+            return $this->fail('Failed to upload image: '.$e->getMessage(), 500);
         }
     }
 
     /**
-     * Get image data for a support record.
-     *
-     * @param int $id
-     * @return \Illuminate\Http\JsonResponse
+     * Get image for support record.
      */
-    public function getImage($id)
+    public function getImage(string $id): JsonResponse
     {
         try {
-            // Temporarily increase memory limit for image processing
-            $originalMemoryLimit = ini_get('memory_limit');
-            ini_set('memory_limit', '512M');
-
-            $support = XxSupport::with('supportImageWithData')->find($id);
-
-            if (!$support) {
-                ini_set('memory_limit', $originalMemoryLimit);
-                return response()->json([
-                    'message' => 'Support record not found',
-                    'data' => []
-                ], 404, [], JSON_UNESCAPED_UNICODE);
+            $support = XxSupport::find($id);
+            if (! $support || ! $support->support_image_id) {
+                return $this->fail('Support record or image not found', 404);
             }
 
-            if (!$support->supportImageWithData) {
-                ini_set('memory_limit', $originalMemoryLimit);
-                return response()->json([
-                    'message' => 'No image found for this support record',
-                    'data' => []
-                ], 404, [], JSON_UNESCAPED_UNICODE);
+            $supportImage = SupportImage::find($support->support_image_id);
+            if (! $supportImage) {
+                return $this->fail('Support image not found', 404);
             }
 
-            $imageData = $support->supportImageWithData->getImageDataUri();
-
-            if (!$imageData) {
-                ini_set('memory_limit', $originalMemoryLimit);
-                return response()->json([
-                    'message' => 'Error retrieving image data',
-                    'data' => []
-                ], 500, [], JSON_UNESCAPED_UNICODE);
-            }
-
-            $metadata = $support->supportImageWithData->getImageMetadata();
-
-            // Clean up memory
-            unset($support);
-            gc_collect_cycles();
-            ini_set('memory_limit', $originalMemoryLimit);
-
-            return response()->json([
-                'message' => 'Image retrieved successfully',
-                'data' => [
-                    'image_url' => $imageData,
-                    'metadata' => $metadata,
-                ]
-            ], 200, [], JSON_UNESCAPED_UNICODE);
-
-        } catch (\Exception $e) {
-            // Ensure memory limit is restored even on error
-            if (isset($originalMemoryLimit)) {
-                ini_set('memory_limit', $originalMemoryLimit);
-            }
-            Log::error('Error retrieving support image: ' . $e->getMessage());
-            return response()->json([
-                'message' => 'Error retrieving support image: ' . $e->getMessage(),
-                'data' => []
-            ], 500, [], JSON_UNESCAPED_UNICODE);
+            return $this->ok('Support image fetched successfully', [
+                'id' => $supportImage->id,
+                'mime_type' => $supportImage->mime_type,
+                'size' => $supportImage->size,
+                'original_name' => $supportImage->original_name,
+                'image_url' => $supportImage->getImageUrl(),
+                'created_at' => $supportImage->created_at,
+                'updated_at' => $supportImage->updated_at,
+            ]);
+        } catch (Throwable $e) {
+            return $this->fail('Failed to fetch support image: '.$e->getMessage(), 500);
         }
     }
 
     /**
      * Delete image for support record.
-     *
-     * @param int $id
-     * @return \Illuminate\Http\JsonResponse
      */
-    public function deleteImage($id)
+    public function deleteImage(string $id): JsonResponse
     {
         try {
-            // Get authenticated user
-            $user = Auth::user();
-            if (!$user) {
-                return response()->json([
-                    'message' => 'Unauthorized - user not authenticated',
-                    'data' => []
-                ], 401, [], JSON_UNESCAPED_UNICODE);
-            }
-
             $support = XxSupport::find($id);
-
-            if (!$support) {
-                return response()->json([
-                    'message' => 'Support record not found',
-                    'data' => []
-                ], 404, [], JSON_UNESCAPED_UNICODE);
-            }
-
-            // Check if the authenticated user owns this support record
-            if ($support->employee_id !== $user->id) {
-                return response()->json([
-                    'message' => 'Unauthorized - you can only delete images from your own support records',
-                    'data' => []
-                ], 403, [], JSON_UNESCAPED_UNICODE);
+            if (! $support || ! $support->support_image_id) {
+                return $this->fail('Support record or image not found', 404);
             }
 
             DB::beginTransaction();
 
-            // Delete image if exists
-            if ($support->support_image_id) {
-                $image = SupportImage::find($support->support_image_id);
-                if ($image) {
-                    $image->delete();
-                }
-
-                // Remove image reference from support record
-                $support->support_image_id = null;
-                $support->save();
+            $supportImage = SupportImage::find($support->support_image_id);
+            if ($supportImage) {
+                $supportImage->delete();
             }
+
+            $support->update(['support_image_id' => null]);
 
             DB::commit();
 
-            return response()->json([
-                'message' => 'Support image deleted successfully',
-                'data' => [
-                    'has_image' => false
-                ]
-            ], 200, [], JSON_UNESCAPED_UNICODE);
+            return $this->ok('Support image deleted successfully');
+        } catch (Throwable $e) {
+            DB::rollBack();
 
-        } catch (\Exception $e) {
-            DB::rollback();
-            Log::error('Error deleting support image: ' . $e->getMessage());
-            return response()->json([
-                'message' => 'Error deleting image: ' . $e->getMessage(),
-                'data' => []
-            ], 500, [], JSON_UNESCAPED_UNICODE);
+            return $this->fail('Failed to delete support image: '.$e->getMessage(), 500);
         }
     }
 }

@@ -13,7 +13,7 @@ class Page extends Model
 
     protected $fillable = [
         'name',
-        'is_active'
+        'is_active',
     ];
 
     protected $casts = [
@@ -34,9 +34,9 @@ class Page extends Model
     public function roles()
     {
         return $this->belongsToMany(Role::class, 'xxx_page_role_permissions', 'page_id', 'role_id')
-                    ->wherePivot('is_active', true)
-                    ->withPivot('is_active')
-                    ->withTimestamps();
+            ->wherePivot('is_active', true)
+            ->withPivot('is_active')
+            ->withTimestamps();
     }
 
     /**

@@ -9,8 +9,6 @@ return new class extends Migration
     /**
      * Run the migrations.
      * Replace project_type enum with project_name string column
-     *
-     * @return void
      */
     public function up(): void
     {
@@ -27,15 +25,13 @@ return new class extends Migration
 
     /**
      * Reverse the migrations.
-     *
-     * @return void
      */
     public function down(): void
     {
         // Add back the original column
         Schema::table('xxx_projects', function (Blueprint $table) {
-            $table->enum('project_type', ['internal','external','research','maintenance'])
-                  ->after('client_id');
+            $table->enum('project_type', ['internal', 'external', 'research', 'maintenance'])
+                ->after('client_id');
         });
 
         // Drop the new column

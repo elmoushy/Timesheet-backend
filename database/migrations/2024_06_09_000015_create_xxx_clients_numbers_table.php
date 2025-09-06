@@ -19,14 +19,14 @@ return new class extends Migration
             $table->timestamps();
 
             $table->foreign('client_id')
-                  ->references('id')
-                  ->on('xxx_clients')
-                  ->onDelete('cascade');
+                ->references('id')
+                ->on('xxx_clients')
+                ->onDelete('cascade');
 
             $table->foreign('project_id')
-                  ->references('id')
-                  ->on('xxx_projects')
-                  ->onDelete('cascade');
+                ->references('id')
+                ->on('xxx_projects')
+                ->onDelete('cascade');
 
             $table->index('number');
         });

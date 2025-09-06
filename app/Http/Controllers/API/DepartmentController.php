@@ -1,11 +1,12 @@
 <?php
+
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
+use App\Models\AssignedTask;
+use App\Models\Client;
 use App\Models\Department;
 use App\Models\Employee;
-use App\Models\Client;
-use App\Models\AssignedTask;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +21,7 @@ class DepartmentController extends Controller
     {
         return response()->json(['message' => $msg, 'data' => $data], $code);
     }
+
     private function fail(string $msg, int $code = 400): JsonResponse
     {
         return response()->json(['message' => $msg, 'data' => []], $code);
@@ -33,7 +35,7 @@ class DepartmentController extends Controller
                 'required',
                 'string',
                 'max:255',
-                $id > 0 ? Rule::unique('xxx_departments', 'name')->ignore($id) : Rule::unique('xxx_departments', 'name')
+                $id > 0 ? Rule::unique('xxx_departments', 'name')->ignore($id) : Rule::unique('xxx_departments', 'name'),
             ],
             'notes' => 'nullable|string',
             'managers' => 'sometimes|array',
@@ -53,6 +55,7 @@ class DepartmentController extends Controller
     public function show(int $id): JsonResponse
     {
         $department = Department::with(['managers', 'employees', 'projects'])->find($id);
+
         return $department
             ? $this->ok('Department fetched successfully', $department)
             : $this->fail('Department not found', 404);
@@ -77,6 +80,7 @@ class DepartmentController extends Controller
             }
 
             DB::commit();
+
             return $this->ok(
                 'Department created successfully',
                 $department->load('managers'),
@@ -84,7 +88,8 @@ class DepartmentController extends Controller
             );
         } catch (Throwable $e) {
             DB::rollBack();
-            return $this->fail('Error creating department: ' . $e->getMessage(), 500);
+
+            return $this->fail('Error creating department: '.$e->getMessage(), 500);
         }
     }
 
@@ -92,7 +97,7 @@ class DepartmentController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         $department = Department::find($id);
-        if (!$department) {
+        if (! $department) {
             return $this->fail('Department not found', 404);
         }
 
@@ -113,13 +118,15 @@ class DepartmentController extends Controller
             }
 
             DB::commit();
+
             return $this->ok(
                 'Department updated successfully',
                 $department->load('managers')
             );
         } catch (Throwable $e) {
             DB::rollBack();
-            return $this->fail('Error updating department: ' . $e->getMessage(), 500);
+
+            return $this->fail('Error updating department: '.$e->getMessage(), 500);
         }
     }
 
@@ -127,33 +134,35 @@ class DepartmentController extends Controller
     public function destroy(int $id): JsonResponse
     {
         $department = Department::find($id);
-        if (!$department) {
+        if (! $department) {
             return $this->fail('Department not found', 404);
         }
 
         try {
             $department->delete(); // This will cascade to department managers through foreign keys
+
             return $this->ok('Department deleted successfully');
         } catch (Throwable $e) {
-            return $this->fail('Error deleting department: ' . $e->getMessage(), 500);
+            return $this->fail('Error deleting department: '.$e->getMessage(), 500);
         }
     }
 
     public function bulkDestroy(Request $request): JsonResponse
     {
         $ids = $request->input('ids', []);
-        if (!is_array($ids) || empty($ids)) {
+        if (! is_array($ids) || empty($ids)) {
             return $this->fail('ids must be a non-empty array', 422);
         }
 
         try {
             $deleted = Department::whereIn('id', $ids)->delete();
+
             return $this->ok($deleted
                 ? "$deleted department(s) deleted successfully"
                 : 'No departments were deleted'
             );
         } catch (Throwable $e) {
-            return $this->fail('Error deleting departments: ' . $e->getMessage(), 500);
+            return $this->fail('Error deleting departments: '.$e->getMessage(), 500);
         }
     }
 
@@ -176,7 +185,7 @@ class DepartmentController extends Controller
     public function addManager(Request $request, int $id): JsonResponse
     {
         $department = Department::find($id);
-        if (!$department) {
+        if (! $department) {
             return $this->fail('Department not found', 404);
         }
 
@@ -211,14 +220,14 @@ class DepartmentController extends Controller
                 $department->load('managers')
             );
         } catch (Throwable $e) {
-            return $this->fail('Error adding department manager: ' . $e->getMessage(), 500);
+            return $this->fail('Error adding department manager: '.$e->getMessage(), 500);
         }
     }
 
     public function removeManager(int $departmentId, int $employeeId): JsonResponse
     {
         $department = Department::find($departmentId);
-        if (!$department) {
+        if (! $department) {
             return $this->fail('Department not found', 404);
         }
 
@@ -229,7 +238,7 @@ class DepartmentController extends Controller
                 ? $this->ok('Department manager removed successfully', $department->load('managers'))
                 : $this->fail('Manager not found in this department', 404);
         } catch (Throwable $e) {
-            return $this->fail('Error removing department manager: ' . $e->getMessage(), 500);
+            return $this->fail('Error removing department manager: '.$e->getMessage(), 500);
         }
     }
 
@@ -241,7 +250,7 @@ class DepartmentController extends Controller
 
         // Apply filters if provided
         if ($request->has('term')) {
-            $searchTerm = '%' . $request->input('term') . '%';
+            $searchTerm = '%'.$request->input('term').'%';
             $query->where('name', 'LIKE', $searchTerm);
         }
 
@@ -249,11 +258,11 @@ class DepartmentController extends Controller
         $results = $query->limit(50)->get();
 
         // Format results for dropdown with display text and value
-        $formattedResults = $results->map(function($department) {
+        $formattedResults = $results->map(function ($department) {
             return [
                 'id' => $department->id,
                 'name' => $department->name,
-                'display_text' => $department->name
+                'display_text' => $department->name,
             ];
         });
 
@@ -267,11 +276,11 @@ class DepartmentController extends Controller
 
         // Apply filters if provided
         if ($request->has('term')) {
-            $searchTerm = '%' . $request->input('term') . '%';
-            $query->where(function($q) use ($searchTerm) {
+            $searchTerm = '%'.$request->input('term').'%';
+            $query->where(function ($q) use ($searchTerm) {
                 $q->where('name', 'LIKE', $searchTerm)
-                  ->orWhere('alias', 'LIKE', $searchTerm)
-                  ->orWhere('region', 'LIKE', $searchTerm);
+                    ->orWhere('alias', 'LIKE', $searchTerm)
+                    ->orWhere('region', 'LIKE', $searchTerm);
             });
         }
 
@@ -279,13 +288,13 @@ class DepartmentController extends Controller
         $results = $query->limit(50)->get();
 
         // Format results for dropdown with display text and value
-        $formattedResults = $results->map(function($client) {
+        $formattedResults = $results->map(function ($client) {
             return [
                 'id' => $client->id,
                 'name' => $client->name,
                 'alias' => $client->alias,
                 'region' => $client->region,
-                'display_text' => $client->name . ($client->alias ? ' (' . $client->alias . ')' : '')
+                'display_text' => $client->name.($client->alias ? ' ('.$client->alias.')' : ''),
             ];
         });
 
@@ -296,7 +305,7 @@ class DepartmentController extends Controller
     public function getEmployeeAssignedTasks(int $employeeId): JsonResponse
     {
         $employee = Employee::find($employeeId);
-        if (!$employee) {
+        if (! $employee) {
             return $this->fail('Employee not found', 404);
         }
 
@@ -312,7 +321,7 @@ class DepartmentController extends Controller
                 $assignedTasks
             );
         } catch (Throwable $e) {
-            return $this->fail('Error fetching assigned tasks: ' . $e->getMessage(), 500);
+            return $this->fail('Error fetching assigned tasks: '.$e->getMessage(), 500);
         }
     }
 }

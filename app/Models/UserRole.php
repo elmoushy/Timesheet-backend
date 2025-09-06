@@ -10,13 +10,14 @@ class UserRole extends Model
     use HasFactory;
 
     protected $table = 'xxx_user_roles';
+
     protected $primaryKey = 'user_roles_id';
 
     protected $fillable = [
         'role_id',
         'user_id',
         'is_active',
-        'assigned_by'
+        'assigned_by',
     ];
 
     protected $casts = [

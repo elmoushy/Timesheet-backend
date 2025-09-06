@@ -25,8 +25,8 @@ return new class extends Migration
             $table->timestamps();
 
             $table->foreign('initiated_by', 'fk_bulk_op_mgr')
-                  ->references('id')->on('xxx_employees')
-                  ->onDelete('cascade');
+                ->references('id')->on('xxx_employees')
+                ->onDelete('cascade');
 
             // Indexes
             $table->index(['initiated_by', 'status']);

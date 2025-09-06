@@ -9,8 +9,6 @@ return new class extends Migration
     /**
      * Run the migrations.
      * Adds project_id to tasks table to create relationship between projects and tasks.
-     *
-     * @return void
      */
     public function up(): void
     {
@@ -20,9 +18,9 @@ return new class extends Migration
 
             // Add foreign key constraint
             $table->foreign('project_id', 'fk_task_project')
-                  ->references('id')
-                  ->on('xxx_projects')
-                  ->onDelete('set null');
+                ->references('id')
+                ->on('xxx_projects')
+                ->onDelete('set null');
 
             // Add index for performance
             $table->index('project_id', 'idx_task_project');
@@ -31,8 +29,6 @@ return new class extends Migration
 
     /**
      * Reverse the migrations.
-     *
-     * @return void
      */
     public function down(): void
     {

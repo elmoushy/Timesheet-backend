@@ -9,7 +9,9 @@ class EmpApplication extends Model
     protected $table = 'xxx_emp_application';
 
     public $incrementing = false;
+
     public $timestamps = false;
+
     protected $primaryKey = ['employee_id', 'application_id'];
 
     protected $fillable = [

@@ -18,8 +18,8 @@ return new class extends Migration
             $table->timestamps();
 
             $table->foreign('employee_id', 'fk_eec_emp')
-                  ->references('id')->on('xxx_employees')
-                  ->onDelete('cascade');
+                ->references('id')->on('xxx_employees')
+                ->onDelete('cascade');
         });
     }
 

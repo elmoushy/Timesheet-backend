@@ -9,6 +9,7 @@ class DepartmentManager extends Pivot
     protected $table = 'xxx_department_managers';
 
     public $incrementing = false;
+
     protected $primaryKey = ['department_id', 'employee_id'];
 
     protected $fillable = [

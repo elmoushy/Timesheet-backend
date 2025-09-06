@@ -56,7 +56,7 @@ class SupportImage extends Model
     public function newQuery()
     {
         return parent::newQuery()->select([
-            'id', 'mime_type', 'size', 'original_name', 'created_at', 'updated_at'
+            'id', 'mime_type', 'size', 'original_name', 'created_at', 'updated_at',
         ]);
     }
 
@@ -66,7 +66,8 @@ class SupportImage extends Model
      */
     public static function withImageData()
     {
-        return static::query()->select('*');
+        // Select all columns including image data
+        return static::query()->select(['*']);
     }
 
     /**
@@ -108,15 +109,24 @@ class SupportImage extends Model
      */
     public function getImageUrlAttribute()
     {
-        if (!$this->image) {
+        if (! $this->image) {
             return null;
         }
 
         try {
             $mimeType = $this->mime_type ?: 'image/jpeg';
-            return 'data:' . $mimeType . ';base64,' . base64_encode($this->image);
+
+            // Check if image is already base64 encoded
+            if (base64_decode($this->image, true) !== false) {
+                // Already base64 encoded, use directly
+                return 'data:'.$mimeType.';base64,'.$this->image;
+            } else {
+                // It's binary data, encode it
+                return 'data:'.$mimeType.';base64,'.base64_encode($this->image);
+            }
         } catch (\Exception $e) {
-            \Log::error('Error encoding image to base64: ' . $e->getMessage());
+            \Log::error('Error encoding image to base64: '.$e->getMessage());
+
             return null;
         }
     }
@@ -129,23 +139,55 @@ class SupportImage extends Model
     public function getImageDataUri()
     {
         // If image data is not loaded, load it specifically
-        if (!isset($this->attributes['image'])) {
-            $imageData = static::withImageData()->find($this->id);
-            if (!$imageData || !$imageData->image) {
+        if (! isset($this->attributes['image'])) {
+            // Use a smaller select to reduce memory usage
+            $imageData = static::withImageData()
+                ->select(['id', 'image', 'mime_type'])
+                ->find($this->id);
+
+            if (! $imageData || ! $imageData->image) {
                 return null;
             }
+
+            // Only assign the image attribute, not the entire model
             $this->attributes['image'] = $imageData->image;
         }
 
-        if (!$this->image) {
+        if (! $this->image) {
             return null;
         }
 
         try {
             $mimeType = $this->mime_type ?: 'image/jpeg';
-            return 'data:' . $mimeType . ';base64,' . base64_encode($this->image);
+
+            // Check if image is already base64 encoded
+            if (base64_decode($this->image, true) !== false) {
+                // Already base64 encoded, use directly
+                $result = 'data:'.$mimeType.';base64,'.$this->image;
+
+                // Clear the image from memory as we no longer need it
+                unset($this->attributes['image']);
+                gc_collect_cycles();
+
+                return $result;
+            } else {
+                // It's binary data, encode it
+                $encoded = base64_encode($this->image);
+                $result = 'data:'.$mimeType.';base64,'.$encoded;
+
+                // Clear the image from memory as we no longer need it
+                unset($this->attributes['image'], $encoded);
+                gc_collect_cycles();
+
+                return $result;
+            }
         } catch (\Exception $e) {
-            \Log::error('Error encoding image to base64: ' . $e->getMessage());
+            // Clear the image from memory on error
+            unset($this->attributes['image']);
+            gc_collect_cycles();
+
+            \Log::error('Error encoding image to base64: '.$e->getMessage());
+
             return null;
         }
     }
@@ -175,14 +217,22 @@ class SupportImage extends Model
      */
     public function getImageBase64Attribute()
     {
-        if (!$this->image) {
+        if (! $this->image) {
             return null;
         }
 
         try {
-            return base64_encode($this->image);
+            // Check if image is already base64 encoded
+            if (base64_decode($this->image, true) !== false) {
+                // Already base64 encoded, return directly
+                return $this->image;
+            } else {
+                // It's binary data, encode it
+                return base64_encode($this->image);
+            }
         } catch (\Exception $e) {
-            \Log::error('Error encoding image to base64: ' . $e->getMessage());
+            \Log::error('Error encoding image to base64: '.$e->getMessage());
+
             return null;
         }
     }
@@ -196,7 +246,7 @@ class SupportImage extends Model
     {
         // Check if image data is loaded
         if (isset($this->attributes['image'])) {
-            return !empty($this->image);
+            return ! empty($this->image);
         }
 
         // If image data is not loaded, check if we have a size > 0
@@ -205,9 +255,71 @@ class SupportImage extends Model
     }
 
     /**
+     * Create a SupportImage from an uploaded file.
+     *
+     * @param  \Illuminate\Http\UploadedFile  $file
+     * @return static
+     */
+    public static function createFromUploadedFile($file)
+    {
+        // Get file contents
+        $imageData = file_get_contents($file->getPathname());
+
+        // Create the support image
+        return static::create([
+            'image' => $imageData,
+            'mime_type' => $file->getClientMimeType(),
+            'size' => $file->getSize(),
+            'original_name' => $file->getClientOriginalName(),
+        ]);
+    }
+
+    /**
+     * Get the image URL as a data URI (only when explicitly requested).
+     *
+     * @return string|null
+     */
+    public function getImageUrl()
+    {
+        if (! isset($this->attributes['image'])) {
+            // Load the image data if not already loaded
+            $imageData = static::withImageData()
+                ->select(['id', 'image', 'mime_type'])
+                ->find($this->id);
+
+            if (! $imageData || ! $imageData->image) {
+                return null;
+            }
+
+            $this->attributes['image'] = $imageData->image;
+        }
+
+        if (! $this->image) {
+            return null;
+        }
+
+        try {
+            $mimeType = $this->mime_type ?: 'image/jpeg';
+
+            // Check if image is already base64 encoded
+            if (base64_decode($this->image, true) !== false) {
+                // Already base64 encoded, use directly
+                return 'data:'.$mimeType.';base64,'.$this->image;
+            } else {
+                // It's binary data, encode it
+                return 'data:'.$mimeType.';base64,'.base64_encode($this->image);
+            }
+        } catch (\Exception $e) {
+            \Log::error('Error encoding image to base64: '.$e->getMessage());
+
+            return null;
+        }
+    }
+
+    /**
      * Validate and sanitize image data before storage.
      *
-     * @param mixed $imageData
+     * @param  mixed  $imageData
      * @return string|null
      */
     public static function sanitizeImageData($imageData)
@@ -217,31 +329,85 @@ class SupportImage extends Model
         }
 
         // Ensure the data is a string
-        if (!is_string($imageData)) {
+        if (! is_string($imageData)) {
             return null;
         }
 
-        // Check if it's valid binary data
-        if (mb_check_encoding($imageData, 'UTF-8') && !preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', $imageData)) {
-            // If it's already UTF-8 text (base64), decode it
-            $decoded = base64_decode($imageData, true);
-            if ($decoded !== false) {
-                return $decoded;
-            }
+        // Check if it's already base64 encoded
+        if (base64_decode($imageData, true) !== false) {
+            // It's already base64 encoded, return as is
+            return $imageData;
         }
 
-        return $imageData;
+        // If it's binary data, encode it as base64
+        return base64_encode($imageData);
     }
 
     /**
-     * Override the create method to sanitize image data.
+     * Override the create method to optimize memory usage.
+     * Use smaller chunks when dealing with large files.
+     *
+     * @return static
      */
     public static function create(array $attributes = [])
     {
-        if (isset($attributes['image'])) {
-            $attributes['image'] = static::sanitizeImageData($attributes['image']);
-        }
+        // Set higher memory limit temporarily for this operation
+        $originalMemoryLimit = ini_get('memory_limit');
+        ini_set('memory_limit', '384M');
 
-        return parent::create($attributes);
+        try {
+            if (isset($attributes['image'])) {
+                $attributes['image'] = static::sanitizeImageData($attributes['image']);
+            }
+
+            $instance = new static($attributes);
+            $instance->save();
+
+            // Free memory
+            if (isset($attributes['image'])) {
+                unset($attributes['image']);
+                gc_collect_cycles();
+            }
+
+            // Restore memory limit
+            ini_set('memory_limit', $originalMemoryLimit);
+
+            return $instance;
+        } catch (\Exception $e) {
+            // Restore memory limit on error
+            ini_set('memory_limit', $originalMemoryLimit);
+            throw $e;
+        }
+    }
+
+    /**
+     * Override the save method to optimize memory usage.
+     *
+     * @return bool
+     */
+    public function save(array $options = [])
+    {
+        // Set higher memory limit temporarily for this operation
+        $originalMemoryLimit = ini_get('memory_limit');
+        ini_set('memory_limit', '384M');
+
+        try {
+            $result = parent::save($options);
+
+            // Free memory from image data immediately after save
+            if (isset($this->attributes['image'])) {
+                unset($this->attributes['image']);
+                gc_collect_cycles();
+            }
+
+            // Restore memory limit
+            ini_set('memory_limit', $originalMemoryLimit);
+
+            return $result;
+        } catch (\Exception $e) {
+            // Restore memory limit on error
+            ini_set('memory_limit', $originalMemoryLimit);
+            throw $e;
+        }
     }
 }

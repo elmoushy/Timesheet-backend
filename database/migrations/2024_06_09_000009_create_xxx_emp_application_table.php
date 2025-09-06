@@ -12,14 +12,14 @@ return new class extends Migration
             $table->unsignedBigInteger('employee_id');
             $table->unsignedBigInteger('application_id');
 
-            $table->primary(['employee_id','application_id'], 'pk_emp_app');
+            $table->primary(['employee_id', 'application_id'], 'pk_emp_app');
 
             $table->foreign('employee_id', 'fk_ea_emp')
-                  ->references('id')->on('xxx_employees')
-                  ->onDelete('cascade');
+                ->references('id')->on('xxx_employees')
+                ->onDelete('cascade');
             $table->foreign('application_id', 'fk_ea_app')
-                  ->references('id')->on('xxx_applications')
-                  ->onDelete('cascade');
+                ->references('id')->on('xxx_applications')
+                ->onDelete('cascade');
         });
     }
 

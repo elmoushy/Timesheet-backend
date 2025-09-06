@@ -2,10 +2,9 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
 
 class PagesTableSeeder extends Seeder
 {
@@ -15,28 +14,30 @@ class PagesTableSeeder extends Seeder
     public function run(): void
     {
         $pages = [
-            ['name' => 'Login', 'is_active' => true],
-            ['name' => 'Dashboard', 'is_active' => true],
-            ['name' => 'Home', 'is_active' => true],
-            ['name' => 'Applications', 'is_active' => true],
-            ['name' => 'Clients', 'is_active' => true],
-            ['name' => 'Departments', 'is_active' => true],
-            ['name' => 'Employees', 'is_active' => true],
-            ['name' => 'Projects', 'is_active' => true],
-            ['name' => 'Tasks', 'is_active' => true],
-            ['name' => 'TimeSheet', 'is_active' => true],
-            ['name' => 'Support', 'is_active' => true],
-            ['name' => 'TimeManagement', 'is_active' => true],
-            ['name' => 'DepartmentTimeManager', 'is_active' => true],
-            ['name' => 'Manager', 'is_active' => true],
-            ['name' => 'ProjectEmployeeRequest', 'is_active' => true],
-            ['name' => 'PendingPMApprovals', 'is_active' => true],
-            ['name' => 'PendingDMApprovals', 'is_active' => true],
-            ['name' => 'PendingGMApprovals', 'is_active' => true],
-            ['name' => 'Settings', 'is_active' => true],
-            ['name' => 'Notifications', 'is_active' => true],
-            ['name' => 'AssignedToMe', 'is_active' => true],
-            ['name' => 'AddTeamMember', 'is_active' => true],
+            // all this pages Admin Role have access
+            ['name' => 'Login', 'is_active' => true], // all existed roles
+            ['name' => 'Dashboard', 'is_active' => true], // all existed roles
+            ['name' => 'Home', 'is_active' => true], // all exist roles
+            ['name' => 'Applications', 'is_active' => true], // Admin and Sales Manager  roles
+            ['name' => 'Clients', 'is_active' => true], // Admin and Sales Manager  roles
+            ['name' => 'Departments', 'is_active' => true], // Admin roles
+            ['name' => 'Employees', 'is_active' => true], // Admin and Sales manager roles
+            ['name' => 'Projects', 'is_active' => true], // Admin and HR
+            ['name' => 'Tasks', 'is_active' => true], // Admin
+            ['name' => 'TimeSheet', 'is_active' => true], // all
+            ['name' => 'Support', 'is_active' => true], // all
+            ['name' => 'TimeManagement', 'is_active' => true], // all
+            ['name' => 'DepartmentTimeManager', 'is_active' => true], // admin and Department Manager Role
+            ['name' => 'Manager', 'is_active' => true], // Department Manager and Project Manager and Admin
+            ['name' => 'ProjectEmployeeRequest', 'is_active' => true], // Project Manager and Admin
+            ['name' => 'PendingPMApprovals', 'is_active' => true], // Project Manager
+            ['name' => 'PendingDMApprovals', 'is_active' => true], // Department Manager
+            ['name' => 'PendingGMApprovals', 'is_active' => true], // General Manager
+            ['name' => 'Settings', 'is_active' => true], // Admin and HR
+            ['name' => 'Notifications', 'is_active' => true], // all
+            ['name' => 'AssignedToMe', 'is_active' => true], // all
+            ['name' => 'AddTeamMember', 'is_active' => true], // Admin and HR
+            ['name' => 'PermissionManagement', 'is_active' => true], // Admin and HR
         ];
 
         $timestamp = Carbon::now();

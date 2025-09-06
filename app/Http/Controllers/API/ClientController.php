@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
@@ -31,7 +32,7 @@ class ClientController extends Controller
                 'required',
                 'string',
                 'max:255',
-                $id > 0 ? Rule::unique('xxx_clients', 'name')->ignore($id) : Rule::unique('xxx_clients', 'name')
+                $id > 0 ? Rule::unique('xxx_clients', 'name')->ignore($id) : Rule::unique('xxx_clients', 'name'),
             ],
             'alias' => 'nullable|string|max:100',
             'region' => 'nullable|string|max:100',
@@ -39,9 +40,9 @@ class ClientController extends Controller
             'business_sector' => 'nullable|string|max:100',
             'notes' => 'nullable|string',
             'contact_numbers' => 'nullable|array',
-            'contact_numbers.*.name' => 'required|string|max:100',
-            'contact_numbers.*.number' => 'required|string|max:50',
-            'contact_numbers.*.type' => 'nullable|string|max:100',
+            'contact_numbers.*.name' => 'required_with:contact_numbers|string|max:100',
+            'contact_numbers.*.number' => 'required_with:contact_numbers|string|max:50',
+            'contact_numbers.*.type' => 'nullable|string|in:client,oracle,private,other',
             'contact_numbers.*.is_primary' => 'boolean',
         ];
     }
@@ -53,11 +54,11 @@ class ClientController extends Controller
 
         // Apply search filters if provided
         if ($request->has('search')) {
-            $searchTerm = '%' . $request->input('search') . '%';
-            $query->where(function($q) use ($searchTerm) {
+            $searchTerm = '%'.$request->input('search').'%';
+            $query->where(function ($q) use ($searchTerm) {
                 $q->where('name', 'LIKE', $searchTerm)
-                  ->orWhere('alias', 'LIKE', $searchTerm)
-                  ->orWhere('business_sector', 'LIKE', $searchTerm);
+                    ->orWhere('alias', 'LIKE', $searchTerm)
+                    ->orWhere('business_sector', 'LIKE', $searchTerm);
             });
         }
 
@@ -76,6 +77,7 @@ class ClientController extends Controller
     {
         // Return all clients for dropdown/select lists (no pagination)
         $clients = Client::with('contactNumbers')->select('id', 'name', 'alias')->orderBy('name')->get();
+
         return $this->ok('All clients fetched successfully', $clients);
     }
 
@@ -83,6 +85,7 @@ class ClientController extends Controller
     public function show(int $id): JsonResponse
     {
         $client = Client::with(['projects', 'contactNumbers'])->find($id);
+
         return $client
             ? $this->ok('Client fetched successfully', $client)
             : $this->fail('Client not found', 404);
@@ -98,17 +101,18 @@ class ClientController extends Controller
 
         try {
             $client = Client::create($request->only([
-                'name', 'alias', 'region', 'address', 'business_sector', 'notes'
+                'name', 'alias', 'region', 'address', 'business_sector', 'notes',
             ]));
 
-            // Handle contact numbers if provided
+            // Handle contact numbers if provided - these are client-specific contact numbers
             if ($request->has('contact_numbers') && is_array($request->contact_numbers)) {
                 foreach ($request->contact_numbers as $numberData) {
                     $client->contactNumbers()->create([
                         'name' => $numberData['name'],
                         'number' => $numberData['number'],
-                        'type' => $numberData['type'] ?? null,
+                        'type' => $numberData['type'] ?? 'client',
                         'is_primary' => $numberData['is_primary'] ?? false,
+                        'project_id' => null, // Ensure this is a client contact number, not project-specific
                     ]);
                 }
             }
@@ -118,7 +122,7 @@ class ClientController extends Controller
 
             return $this->ok('Client created successfully', $client, 201);
         } catch (Throwable $e) {
-            return $this->fail('Error creating client: ' . $e->getMessage(), 500);
+            return $this->fail('Error creating client: '.$e->getMessage(), 500);
         }
     }
 
@@ -126,7 +130,7 @@ class ClientController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         $client = Client::find($id);
-        if (!$client) {
+        if (! $client) {
             return $this->fail('Client not found', 404);
         }
 
@@ -137,22 +141,23 @@ class ClientController extends Controller
 
         try {
             $client->update($request->only([
-                'name', 'alias', 'region', 'address', 'business_sector', 'notes'
+                'name', 'alias', 'region', 'address', 'business_sector', 'notes',
             ]));
 
-            // Handle contact numbers if provided
+            // Handle contact numbers if provided - these are client-specific contact numbers
             if ($request->has('contact_numbers')) {
-                // Delete existing contact numbers
-                $client->contactNumbers()->delete();
+                // Delete existing client contact numbers (only those without project_id)
+                $client->contactNumbers()->whereNull('project_id')->delete();
 
-                // Create new contact numbers
+                // Create new contact numbers for the client
                 if (is_array($request->contact_numbers)) {
                     foreach ($request->contact_numbers as $numberData) {
                         $client->contactNumbers()->create([
                             'name' => $numberData['name'],
                             'number' => $numberData['number'],
-                            'type' => $numberData['type'] ?? null,
+                            'type' => $numberData['type'] ?? 'client',
                             'is_primary' => $numberData['is_primary'] ?? false,
+                            'project_id' => null, // Ensure this is a client contact number, not project-specific
                         ]);
                     }
                 }
@@ -163,7 +168,7 @@ class ClientController extends Controller
 
             return $this->ok('Client updated successfully', $client);
         } catch (Throwable $e) {
-            return $this->fail('Error updating client: ' . $e->getMessage(), 500);
+            return $this->fail('Error updating client: '.$e->getMessage(), 500);
         }
     }
 
@@ -171,7 +176,7 @@ class ClientController extends Controller
     public function destroy(int $id): JsonResponse
     {
         $client = Client::find($id);
-        if (!$client) {
+        if (! $client) {
             return $this->fail('Client not found', 404);
         }
 
@@ -186,16 +191,17 @@ class ClientController extends Controller
 
             // Delete the client
             $client->delete();
+
             return $this->ok('Client deleted successfully');
         } catch (Throwable $e) {
-            return $this->fail('Error deleting client: ' . $e->getMessage(), 500);
+            return $this->fail('Error deleting client: '.$e->getMessage(), 500);
         }
     }
 
     public function bulkDestroy(Request $request): JsonResponse
     {
         $ids = $request->input('ids', []);
-        if (!is_array($ids) || empty($ids)) {
+        if (! is_array($ids) || empty($ids)) {
             return $this->fail('ids must be a non-empty array', 422);
         }
 
@@ -206,9 +212,9 @@ class ClientController extends Controller
                 ->pluck('name')
                 ->toArray();
 
-            if (!empty($clientsWithProjects)) {
+            if (! empty($clientsWithProjects)) {
                 return $this->fail(
-                    'Cannot delete clients with associated projects: ' . implode(', ', $clientsWithProjects),
+                    'Cannot delete clients with associated projects: '.implode(', ', $clientsWithProjects),
                     422
                 );
             }
@@ -218,12 +224,13 @@ class ClientController extends Controller
 
             // Delete the clients
             $deleted = Client::whereIn('id', $ids)->delete();
+
             return $this->ok($deleted
                 ? "$deleted client(s) deleted successfully"
                 : 'No clients were deleted'
             );
         } catch (Throwable $e) {
-            return $this->fail('Error deleting clients: ' . $e->getMessage(), 500);
+            return $this->fail('Error deleting clients: '.$e->getMessage(), 500);
         }
     }
 
@@ -231,15 +238,16 @@ class ClientController extends Controller
     public function destroyClientNumber(int $id): JsonResponse
     {
         $clientNumber = ClientNumber::find($id);
-        if (!$clientNumber) {
+        if (! $clientNumber) {
             return $this->fail('Client number not found', 404);
         }
 
         try {
             $clientNumber->delete();
+
             return $this->ok('Client number deleted successfully');
         } catch (Throwable $e) {
-            return $this->fail('Error deleting client number: ' . $e->getMessage(), 500);
+            return $this->fail('Error deleting client number: '.$e->getMessage(), 500);
         }
     }
 }

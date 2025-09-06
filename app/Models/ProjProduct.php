@@ -9,7 +9,9 @@ class ProjProduct extends Model
     protected $table = 'xxx_proj_products';
 
     public $incrementing = false;
+
     public $timestamps = false;
+
     protected $primaryKey = ['project_id', 'product_id'];
 
     protected $fillable = [

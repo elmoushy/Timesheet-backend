@@ -12,7 +12,7 @@ return new class extends Migration
             $table->bigIncrements('id');
 
             $table->unsignedBigInteger('client_id');
-            $table->enum('project_type', ['internal','external','research','maintenance']);
+            $table->enum('project_type', ['internal', 'external', 'research', 'maintenance']);
             $table->unsignedBigInteger('department_id');
             $table->date('start_date');
             $table->date('end_date');
@@ -28,19 +28,19 @@ return new class extends Migration
             $table->text('notes')->nullable();
             $table->timestamps();
 
-            $table->index(['start_date','end_date'], 'idx_proj_dates');
+            $table->index(['start_date', 'end_date'], 'idx_proj_dates');
 
             $table->foreign('client_id', 'fk_proj_client')
-                  ->references('id')->on('xxx_clients')
-                  ->onDelete('cascade');
+                ->references('id')->on('xxx_clients')
+                ->onDelete('cascade');
 
             $table->foreign('department_id', 'fk_proj_dept')
-                  ->references('id')->on('xxx_departments')
-                  ->onDelete('cascade');
+                ->references('id')->on('xxx_departments')
+                ->onDelete('cascade');
 
             $table->foreign('project_manager_id', 'fk_proj_mgr')
-                  ->references('id')->on('xxx_employees')
-                  ->onDelete('cascade');
+                ->references('id')->on('xxx_employees')
+                ->onDelete('cascade');
         });
     }
 

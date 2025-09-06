@@ -17,7 +17,7 @@ class OracleDatabaseServiceProvider extends ServiceProvider
     public function register()
     {
         $this->app->singleton('db.connector.oracle', function ($app) {
-            return new OracleConnector();
+            return new OracleConnector;
         });
 
         $this->app->bind('db.connection.oracle', function ($app, $parameters) {
@@ -50,7 +50,7 @@ class OracleDatabaseServiceProvider extends ServiceProvider
 
                 return $this->app->make('db.connection.oracle', [
                     'connection' => $connection,
-                    'config' => $config
+                    'config' => $config,
                 ]);
             });
         });

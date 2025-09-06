@@ -3,11 +3,11 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
-use App\Models\PageRolePermission;
 use App\Models\Page;
+use App\Models\PageRolePermission;
 use App\Models\Role;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
 class PageRolePermissionController extends Controller
@@ -38,7 +38,7 @@ class PageRolePermissionController extends Controller
             // Search by page name if specified
             if ($request->has('search')) {
                 $query->whereHas('page', function ($q) use ($request) {
-                    $q->where('name', 'like', '%' . $request->search . '%');
+                    $q->where('name', 'like', '%'.$request->search.'%');
                 });
             }
 
@@ -47,12 +47,12 @@ class PageRolePermissionController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => $permissions,
-                'message' => 'Page role permissions retrieved successfully'
+                'message' => 'Page role permissions retrieved successfully',
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error retrieving page role permissions: ' . $e->getMessage()
+                'message' => 'Error retrieving page role permissions: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -66,18 +66,18 @@ class PageRolePermissionController extends Controller
             $validatedData = $request->validate([
                 'page_id' => 'required|exists:xxx_pages,id',
                 'role_id' => 'required|exists:xxx_roles,id',
-                'is_active' => 'boolean'
+                'is_active' => 'boolean',
             ]);
 
             // Check if the combination already exists
             $existingPermission = PageRolePermission::where('page_id', $validatedData['page_id'])
-                                                  ->where('role_id', $validatedData['role_id'])
-                                                  ->first();
+                ->where('role_id', $validatedData['role_id'])
+                ->first();
 
             if ($existingPermission) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Page role permission already exists'
+                    'message' => 'Page role permission already exists',
                 ], 422);
             }
 
@@ -87,18 +87,18 @@ class PageRolePermissionController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => $permission,
-                'message' => 'Page role permission created successfully'
+                'message' => 'Page role permission created successfully',
             ], 201);
         } catch (ValidationException $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
-                'errors' => $e->errors()
+                'errors' => $e->errors(),
             ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error creating page role permission: ' . $e->getMessage()
+                'message' => 'Error creating page role permission: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -111,22 +111,22 @@ class PageRolePermissionController extends Controller
         try {
             $permission = PageRolePermission::with(['page', 'role'])->find($id);
 
-            if (!$permission) {
+            if (! $permission) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Page role permission not found'
+                    'message' => 'Page role permission not found',
                 ], 404);
             }
 
             return response()->json([
                 'success' => true,
                 'data' => $permission,
-                'message' => 'Page role permission retrieved successfully'
+                'message' => 'Page role permission retrieved successfully',
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error retrieving page role permission: ' . $e->getMessage()
+                'message' => 'Error retrieving page role permission: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -139,17 +139,17 @@ class PageRolePermissionController extends Controller
         try {
             $permission = PageRolePermission::find($id);
 
-            if (!$permission) {
+            if (! $permission) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Page role permission not found'
+                    'message' => 'Page role permission not found',
                 ], 404);
             }
 
             $validatedData = $request->validate([
                 'page_id' => 'sometimes|required|exists:xxx_pages,id',
                 'role_id' => 'sometimes|required|exists:xxx_roles,id',
-                'is_active' => 'sometimes|boolean'
+                'is_active' => 'sometimes|boolean',
             ]);
 
             // Check if the new combination already exists (excluding current record)
@@ -158,14 +158,14 @@ class PageRolePermissionController extends Controller
                 $roleId = $validatedData['role_id'] ?? $permission->role_id;
 
                 $existingPermission = PageRolePermission::where('page_id', $pageId)
-                                                      ->where('role_id', $roleId)
-                                                      ->where('id', '!=', $id)
-                                                      ->first();
+                    ->where('role_id', $roleId)
+                    ->where('id', '!=', $id)
+                    ->first();
 
                 if ($existingPermission) {
                     return response()->json([
                         'success' => false,
-                        'message' => 'Page role permission already exists'
+                        'message' => 'Page role permission already exists',
                     ], 422);
                 }
             }
@@ -176,18 +176,18 @@ class PageRolePermissionController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => $permission,
-                'message' => 'Page role permission updated successfully'
+                'message' => 'Page role permission updated successfully',
             ]);
         } catch (ValidationException $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
-                'errors' => $e->errors()
+                'errors' => $e->errors(),
             ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error updating page role permission: ' . $e->getMessage()
+                'message' => 'Error updating page role permission: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -200,10 +200,10 @@ class PageRolePermissionController extends Controller
         try {
             $permission = PageRolePermission::find($id);
 
-            if (!$permission) {
+            if (! $permission) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Page role permission not found'
+                    'message' => 'Page role permission not found',
                 ], 404);
             }
 
@@ -211,12 +211,12 @@ class PageRolePermissionController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Page role permission deleted successfully'
+                'message' => 'Page role permission deleted successfully',
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error deleting page role permission: ' . $e->getMessage()
+                'message' => 'Error deleting page role permission: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -229,25 +229,25 @@ class PageRolePermissionController extends Controller
         try {
             $permission = PageRolePermission::find($id);
 
-            if (!$permission) {
+            if (! $permission) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Page role permission not found'
+                    'message' => 'Page role permission not found',
                 ], 404);
             }
 
-            $permission->update(['is_active' => !$permission->is_active]);
+            $permission->update(['is_active' => ! $permission->is_active]);
             $permission->load(['page', 'role']);
 
             return response()->json([
                 'success' => true,
                 'data' => $permission,
-                'message' => 'Page role permission status updated successfully'
+                'message' => 'Page role permission status updated successfully',
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error updating permission status: ' . $e->getMessage()
+                'message' => 'Error updating permission status: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -261,7 +261,7 @@ class PageRolePermissionController extends Controller
             $validatedData = $request->validate([
                 'role_id' => 'required|exists:xxx_roles,id',
                 'page_ids' => 'required|array',
-                'page_ids.*' => 'exists:xxx_pages,id'
+                'page_ids.*' => 'exists:xxx_pages,id',
             ]);
 
             $permissions = [];
@@ -269,14 +269,14 @@ class PageRolePermissionController extends Controller
             foreach ($validatedData['page_ids'] as $pageId) {
                 // Check if permission already exists
                 $existing = PageRolePermission::where('role_id', $validatedData['role_id'])
-                                            ->where('page_id', $pageId)
-                                            ->first();
+                    ->where('page_id', $pageId)
+                    ->first();
 
-                if (!$existing) {
+                if (! $existing) {
                     $permissions[] = PageRolePermission::create([
                         'role_id' => $validatedData['role_id'],
                         'page_id' => $pageId,
-                        'is_active' => true
+                        'is_active' => true,
                     ]);
                 }
             }
@@ -284,18 +284,18 @@ class PageRolePermissionController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => $permissions,
-                'message' => count($permissions) . ' page permissions assigned successfully'
+                'message' => count($permissions).' page permissions assigned successfully',
             ], 201);
         } catch (ValidationException $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
-                'errors' => $e->errors()
+                'errors' => $e->errors(),
             ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error bulk assigning permissions: ' . $e->getMessage()
+                'message' => 'Error bulk assigning permissions: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -308,27 +308,27 @@ class PageRolePermissionController extends Controller
         try {
             $page = Page::find($pageId);
 
-            if (!$page) {
+            if (! $page) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Page not found'
+                    'message' => 'Page not found',
                 ], 404);
             }
 
             $permissions = PageRolePermission::with(['role'])
-                                           ->where('page_id', $pageId)
-                                           ->orderBy('created_at', 'desc')
-                                           ->get();
+                ->where('page_id', $pageId)
+                ->orderBy('created_at', 'desc')
+                ->get();
 
             return response()->json([
                 'success' => true,
                 'data' => $permissions,
-                'message' => 'Page permissions retrieved successfully'
+                'message' => 'Page permissions retrieved successfully',
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error retrieving page permissions: ' . $e->getMessage()
+                'message' => 'Error retrieving page permissions: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -341,27 +341,27 @@ class PageRolePermissionController extends Controller
         try {
             $role = Role::find($roleId);
 
-            if (!$role) {
+            if (! $role) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Role not found'
+                    'message' => 'Role not found',
                 ], 404);
             }
 
             $permissions = PageRolePermission::with(['page'])
-                                           ->where('role_id', $roleId)
-                                           ->orderBy('created_at', 'desc')
-                                           ->get();
+                ->where('role_id', $roleId)
+                ->orderBy('created_at', 'desc')
+                ->get();
 
             return response()->json([
                 'success' => true,
                 'data' => $permissions,
-                'message' => 'Role permissions retrieved successfully'
+                'message' => 'Role permissions retrieved successfully',
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error retrieving role permissions: ' . $e->getMessage()
+                'message' => 'Error retrieving role permissions: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -376,9 +376,9 @@ class PageRolePermissionController extends Controller
             $roles = Role::active()->orderBy('name')->get();
 
             $permissions = PageRolePermission::active()
-                                           ->with(['page', 'role'])
-                                           ->get()
-                                           ->groupBy('page_id');
+                ->with(['page', 'role'])
+                ->get()
+                ->groupBy('page_id');
 
             $matrix = [];
 
@@ -393,7 +393,7 @@ class PageRolePermissionController extends Controller
 
                 $matrix[] = [
                     'page' => $page,
-                    'role_permissions' => $rolePermissions
+                    'role_permissions' => $rolePermissions,
                 ];
             }
 
@@ -401,14 +401,121 @@ class PageRolePermissionController extends Controller
                 'success' => true,
                 'data' => [
                     'roles' => $roles,
-                    'matrix' => $matrix
+                    'matrix' => $matrix,
                 ],
-                'message' => 'Permission matrix retrieved successfully'
+                'message' => 'Permission matrix retrieved successfully',
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error retrieving permission matrix: ' . $e->getMessage()
+                'message' => 'Error retrieving permission matrix: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Bulk create multiple page role permissions
+     */
+    public function bulkStore(Request $request): JsonResponse
+    {
+        try {
+            $validatedData = $request->validate([
+                'permissions' => 'required|array',
+                'permissions.*.page_id' => 'required|exists:xxx_pages,id',
+                'permissions.*.role_id' => 'required|exists:xxx_roles,id',
+                'permissions.*.is_active' => 'boolean',
+            ]);
+
+            $createdPermissions = [];
+            $skippedPermissions = [];
+
+            foreach ($validatedData['permissions'] as $permissionData) {
+                // Check if the combination already exists
+                $existing = PageRolePermission::where('page_id', $permissionData['page_id'])
+                    ->where('role_id', $permissionData['role_id'])
+                    ->first();
+
+                if (! $existing) {
+                    $permission = PageRolePermission::create([
+                        'page_id' => $permissionData['page_id'],
+                        'role_id' => $permissionData['role_id'],
+                        'is_active' => $permissionData['is_active'] ?? true,
+                    ]);
+                    $permission->load(['page', 'role']);
+                    $createdPermissions[] = $permission;
+                } else {
+                    $skippedPermissions[] = [
+                        'page_id' => $permissionData['page_id'],
+                        'role_id' => $permissionData['role_id'],
+                        'reason' => 'Permission already exists',
+                    ];
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'created' => $createdPermissions,
+                    'skipped' => $skippedPermissions,
+                ],
+                'message' => count($createdPermissions).' permission(s) created successfully, '.count($skippedPermissions).' skipped',
+            ], 201);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error bulk creating permissions: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Bulk delete multiple page role permissions
+     */
+    public function bulkDelete(Request $request): JsonResponse
+    {
+        try {
+            $validatedData = $request->validate([
+                'ids' => 'required|array',
+                'ids.*' => 'integer|exists:xxx_page_role_permissions,id',
+            ]);
+
+            $deletedCount = 0;
+            $notFoundIds = [];
+
+            foreach ($validatedData['ids'] as $id) {
+                $permission = PageRolePermission::find($id);
+                if ($permission) {
+                    $permission->delete();
+                    $deletedCount++;
+                } else {
+                    $notFoundIds[] = $id;
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'deleted_count' => $deletedCount,
+                    'not_found_ids' => $notFoundIds,
+                ],
+                'message' => $deletedCount.' permission(s) deleted successfully',
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error bulk deleting permissions: '.$e->getMessage(),
             ], 500);
         }
     }

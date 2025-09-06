@@ -42,6 +42,31 @@ class AssignedTask extends Model
     ];
 
     /**
+     * Boot method to register model events for workload updates
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        // When a task assignment is created, update workload
+        static::created(function ($assignedTask) {
+            $assignedTask->updateEmployeeWorkload();
+        });
+
+        // When a task assignment is updated, check if estimated_hours changed
+        static::updated(function ($assignedTask) {
+            if ($assignedTask->wasChanged('estimated_hours')) {
+                $assignedTask->updateEmployeeWorkload();
+            }
+        });
+
+        // When a task assignment is deleted, update workload
+        static::deleted(function ($assignedTask) {
+            $assignedTask->updateEmployeeWorkload();
+        });
+    }
+
+    /**
      * Get the master task this assignment is based on
      */
     public function masterTask(): BelongsTo
@@ -170,7 +195,8 @@ class AssignedTask extends Model
      */
     public function toggleImportant(): bool
     {
-        $this->is_important = !$this->is_important;
+        $this->is_important = ! $this->is_important;
+
         return $this->save();
     }
 
@@ -179,7 +205,8 @@ class AssignedTask extends Model
      */
     public function togglePinned(): bool
     {
-        $this->is_pinned = !$this->is_pinned;
+        $this->is_pinned = ! $this->is_pinned;
+
         return $this->save();
     }
 
@@ -188,11 +215,12 @@ class AssignedTask extends Model
      */
     public function updateStatus(string $newStatus): bool
     {
-        if (!$this->canEditProgress()) {
+        if (! $this->canEditProgress()) {
             return false;
         }
 
         $this->status = $newStatus;
+
         return $this->save();
     }
 
@@ -201,11 +229,66 @@ class AssignedTask extends Model
      */
     public function updateProgress(int $points): bool
     {
-        if (!$this->canEditProgress()) {
+        if (! $this->canEditProgress()) {
             return false;
         }
 
         $this->progress_points = min(max($points, 0), 100);
+
         return $this->save();
+    }
+
+    /**
+     * Recalculate and update employee workload capacity based on all assigned tasks
+     */
+    public function updateEmployeeWorkload(): void
+    {
+        if (! $this->assigned_to) {
+            return;
+        }
+
+        $weekStart = now()->startOfWeek();
+
+        // Calculate total estimated hours for this employee from all assigned tasks
+        $totalHours = self::where('assigned_to', $this->assigned_to)
+            ->sum('estimated_hours') ?? 0;
+
+        // Find existing workload record
+        $workload = EmployeeWorkloadCapacity::where('employee_id', $this->assigned_to)
+            ->whereDate('week_start_date', $weekStart->toDateString())
+            ->first();
+
+        // Create new record if it doesn't exist
+        if (! $workload) {
+            $workload = new EmployeeWorkloadCapacity([
+                'employee_id' => $this->assigned_to,
+                'week_start_date' => $weekStart->toDateString(),
+                'weekly_capacity_hours' => 40,
+                'current_planned_hours' => $totalHours,
+                'workload_percentage' => 0,
+                'workload_status' => 'optimal',
+            ]);
+        } else {
+            // Update existing record
+            $workload->current_planned_hours = $totalHours;
+        }
+
+        // Recalculate percentage and status
+        $workload->workload_percentage = $workload->weekly_capacity_hours > 0
+            ? ($workload->current_planned_hours / $workload->weekly_capacity_hours) * 100
+            : 0;
+
+        // Update status based on percentage
+        if ($workload->workload_percentage < 70) {
+            $workload->workload_status = 'under_utilized';
+        } elseif ($workload->workload_percentage <= 100) {
+            $workload->workload_status = 'optimal';
+        } elseif ($workload->workload_percentage <= 120) {
+            $workload->workload_status = 'over_loaded';
+        } else {
+            $workload->workload_status = 'critical';
+        }
+
+        $workload->save();
     }
 }

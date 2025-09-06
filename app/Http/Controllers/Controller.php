@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Department;
+use App\Models\Project;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Foundation\Validation\ValidatesRequests;
 use Illuminate\Routing\Controller as BaseController;
-use App\Models\Project;
-use App\Models\Department;
 
 class Controller extends BaseController
 {
@@ -39,6 +39,6 @@ class Controller extends BaseController
     protected function managedDepartments()
     {
         return auth()->user()->belongsToMany(Department::class, 'xxx_department_managers')
-                    ->withPivot('is_primary');
+            ->withPivot('is_primary');
     }
 }

@@ -9,8 +9,6 @@ return new class extends Migration
     /**
      * Add password column to xxx_employees table.
      * This enables authentication capabilities for employee accounts.
-     *
-     * @return void
      */
     public function up(): void
     {
@@ -21,8 +19,6 @@ return new class extends Migration
 
     /**
      * Reverse the migrations to remove the password column.
-     *
-     * @return void
      */
     public function down(): void
     {

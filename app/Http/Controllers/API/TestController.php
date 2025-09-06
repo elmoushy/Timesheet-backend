@@ -3,8 +3,6 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Response;
 
 class TestController extends Controller
 {
@@ -19,7 +17,7 @@ class TestController extends Controller
                 'special_chars' => 'éñüíóáàèùïôâêîôûç',
                 'binary_safe' => true,
                 'timestamp' => now()->toISOString(),
-            ]
+            ],
         ], 200, [], JSON_UNESCAPED_UNICODE);
     }
 
@@ -41,14 +39,14 @@ class TestController extends Controller
                     'image_size' => strlen($testImageData),
                     'base64_size' => strlen($base64Data),
                     'mime_type' => 'image/png',
-                    'data_uri' => 'data:image/png;base64,' . $base64Data,
-                ]
+                    'data_uri' => 'data:image/png;base64,'.$base64Data,
+                ],
             ], 200, [], JSON_UNESCAPED_UNICODE);
 
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Binary test failed: ' . $e->getMessage(),
-                'data' => []
+                'message' => 'Binary test failed: '.$e->getMessage(),
+                'data' => [],
             ], 500, [], JSON_UNESCAPED_UNICODE);
         }
     }
@@ -71,13 +69,13 @@ class TestController extends Controller
                     'peak_memory_formatted' => $this->formatBytes($peakMemoryBefore),
                     'memory_limit' => ini_get('memory_limit'),
                     'available_memory' => $this->formatBytes($this->getAvailableMemory()),
-                ]
+                ],
             ], 200, [], JSON_UNESCAPED_UNICODE);
 
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Memory test failed: ' . $e->getMessage(),
-                'data' => []
+                'message' => 'Memory test failed: '.$e->getMessage(),
+                'data' => [],
             ], 500, [], JSON_UNESCAPED_UNICODE);
         }
     }
@@ -87,13 +85,13 @@ class TestController extends Controller
      */
     private function formatBytes($bytes, $precision = 2)
     {
-        $units = array('B', 'KB', 'MB', 'GB', 'TB');
+        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
 
         for ($i = 0; $bytes > 1024 && $i < count($units) - 1; $i++) {
             $bytes /= 1024;
         }
 
-        return round($bytes, $precision) . ' ' . $units[$i];
+        return round($bytes, $precision).' '.$units[$i];
     }
 
     /**

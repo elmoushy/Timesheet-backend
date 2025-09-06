@@ -73,8 +73,6 @@ class TimesheetRow extends Model
      * Calculate total hours for this row.
      * Note: This would typically be handled by a database computed column,
      * but we provide this method for flexibility.
-     *
-     * @return float
      */
     public function calculateTotalHours(): float
     {

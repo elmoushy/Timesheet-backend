@@ -14,8 +14,8 @@ return new class extends Migration
 
             $table->unsignedBigInteger('department_id')->nullable();
             $table->foreign('department_id', 'fk_app_dept')
-                  ->references('id')->on('xxx_departments')
-                  ->onDelete('set null');
+                ->references('id')->on('xxx_departments')
+                ->onDelete('set null');
 
             $table->timestamps();
         });

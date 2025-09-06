@@ -59,7 +59,7 @@ class TimesheetChat extends Model
     /**
      * Get only root-level messages (not replies).
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
     public function scopeRootMessages($query)
@@ -70,7 +70,7 @@ class TimesheetChat extends Model
     /**
      * Get messages with their replies.
      *
-     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @return \Illuminate\Database\Eloquent\Builder
      */
     public function scopeWithReplies($query)
