@@ -56,8 +56,9 @@ class RecalculateWorkload extends Command
 
         $this->info("Recalculating workload for: {$employee->getFullNameAttribute()}");
 
-        // Calculate total estimated hours from assigned tasks
+        // Calculate total estimated hours from assigned tasks excluding blocked tasks
         $totalHours = AssignedTask::where('assigned_to', $employeeId)
+            ->where('status', '!=', 'blocked')
             ->sum('estimated_hours') ?? 0;
 
         $this->updateWorkload($employeeId, $weekStart, $totalHours);
@@ -73,8 +74,9 @@ class RecalculateWorkload extends Command
         $progressBar->start();
 
         foreach ($employees as $employee) {
-            // Calculate total estimated hours from assigned tasks
+            // Calculate total estimated hours from assigned tasks excluding blocked tasks
             $totalHours = AssignedTask::where('assigned_to', $employee->id)
+                ->where('status', '!=', 'blocked')
                 ->sum('estimated_hours') ?? 0;
 
             $this->updateWorkload($employee->id, $weekStart, $totalHours);

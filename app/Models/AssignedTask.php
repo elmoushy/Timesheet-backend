@@ -53,9 +53,9 @@ class AssignedTask extends Model
             $assignedTask->updateEmployeeWorkload();
         });
 
-        // When a task assignment is updated, check if estimated_hours changed
+        // When a task assignment is updated, check if estimated_hours or status changed
         static::updated(function ($assignedTask) {
-            if ($assignedTask->wasChanged('estimated_hours')) {
+            if ($assignedTask->wasChanged('estimated_hours') || $assignedTask->wasChanged('status')) {
                 $assignedTask->updateEmployeeWorkload();
             }
         });
@@ -250,7 +250,9 @@ class AssignedTask extends Model
         $weekStart = now()->startOfWeek();
 
         // Calculate total estimated hours for this employee from all assigned tasks
+        // Exclude blocked tasks as they don't contribute to utilization
         $totalHours = self::where('assigned_to', $this->assigned_to)
+            ->where('status', '!=', 'blocked')
             ->sum('estimated_hours') ?? 0;
 
         // Find existing workload record

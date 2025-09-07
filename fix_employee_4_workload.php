@@ -1,6 +1,9 @@
 <?php
 
-require_once 'vendor/autoload.php';
+requir// Get all assigned tasks for this employee excluding blocked tasks
+$assignedTasks = AssignedTask::where('assigned_to', $employeeId)
+    ->whereIn('status', ['to-do', 'doing']) // Only count active tasks, exclude blocked
+    ->get();ce 'vendor/autoload.php';
 $app = require_once 'bootstrap/app.php';
 $app->make('Illuminate\Contracts\Console\Kernel')->bootstrap();
 

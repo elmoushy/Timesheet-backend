@@ -246,29 +246,58 @@ class DepartmentManagerController extends Controller
         }
 
         try {
-            if (! $this->isDepartmentManager()) {
-                return $this->fail('Access denied. Department manager role required.', 403);
+            $user = Auth::user();
+
+            // Find the task first to check authorization
+            $task = Task::find($request->task_id);
+            if (! $task) {
+                return $this->fail('Task not found', 404);
             }
 
-            $manager = Auth::user();
-            $managedDepartmentIds = $this->getManagedDepartmentIds();
+            // Check authorization: user must be either a department manager OR assigned to the project
+            $isDepartmentManager = $this->isDepartmentManager();
+            $isAssignedToProject = Employee::where('id', $user->id)
+                ->whereHas('projectAssignments', function ($query) use ($task) {
+                    $query->where('project_id', $task->project_id)
+                        ->where('department_approval_status', 'approved');
+                })
+                ->exists();
 
-            // Verify task belongs to managed department
-            $task = Task::whereIn('department_id', $managedDepartmentIds)->find($request->task_id);
-            if (! $task) {
-                return $this->fail('Task not found in your managed departments', 404);
+            if (! $isDepartmentManager && ! $isAssignedToProject) {
+                return $this->fail('Access denied. You must be either a department manager or assigned to the project containing this task.', 403);
             }
 
             // Get employee IDs (support both single and multiple)
             $employeeIds = $request->has('employee_ids') ? $request->employee_ids : [$request->employee_id];
 
-            // Verify all employees belong to managed departments
-            $employees = Employee::whereIn('department_id', $managedDepartmentIds)
-                ->whereIn('id', $employeeIds)
-                ->get();
+            // Verify employees based on user's role
+            if ($isDepartmentManager) {
+                // Department managers can only assign employees from their managed departments
+                $managedDepartmentIds = $this->getManagedDepartmentIds();
+                $taskInManagedDept = Task::whereIn('department_id', $managedDepartmentIds)->find($request->task_id);
+                if (! $taskInManagedDept) {
+                    return $this->fail('Task not found in your managed departments', 404);
+                }
 
-            if ($employees->count() !== count($employeeIds)) {
-                return $this->fail('Some employees not found in your managed departments', 404);
+                $employees = Employee::whereIn('department_id', $managedDepartmentIds)
+                    ->whereIn('id', $employeeIds)
+                    ->get();
+
+                if ($employees->count() !== count($employeeIds)) {
+                    return $this->fail('Some employees not found in your managed departments', 404);
+                }
+            } else {
+                // Non-department managers can assign any employees who are assigned to the same project
+                $employees = Employee::whereIn('id', $employeeIds)
+                    ->whereHas('projectAssignments', function ($query) use ($task) {
+                        $query->where('project_id', $task->project_id)
+                            ->where('department_approval_status', 'approved');
+                    })
+                    ->get();
+
+                if ($employees->count() !== count($employeeIds)) {
+                    return $this->fail('Some employees are not assigned to this project', 404);
+                }
             }
 
             $assignedTasks = [];
@@ -295,7 +324,7 @@ class DepartmentManagerController extends Controller
                     $assignedTask = AssignedTask::create([
                         'task_id' => $request->task_id,
                         'assigned_to' => $employeeId,
-                        'assigned_by' => $manager->id,
+                        'assigned_by' => $user->id,
                         'due_date' => $request->due_date,
                         'estimated_hours' => $request->estimated_hours,
                         'permission_level' => $request->permission_level,
@@ -309,7 +338,7 @@ class DepartmentManagerController extends Controller
                     }
 
                     // Log activity
-                    $this->logTaskActivity('assigned', $assignedTask->id, $manager->id, 'created');
+                    $this->logTaskActivity('assigned', $assignedTask->id, $user->id, 'created');
 
                     $assignedTasks[] = $assignedTask;
 
@@ -363,23 +392,60 @@ class DepartmentManagerController extends Controller
         }
 
         try {
-            if (! $this->isDepartmentManager()) {
-                return $this->fail('Access denied. Department manager role required.', 403);
-            }
+            $user = Auth::user();
 
-            $manager = Auth::user();
-            $managedDepartmentIds = $this->getManagedDepartmentIds();
-
-            // Verify task belongs to managed department
-            $task = Task::whereIn('department_id', $managedDepartmentIds)->find($request->task_id);
+            // Find the task first to check authorization
+            $task = Task::find($request->task_id);
             if (! $task) {
-                return $this->fail('Task not found in your managed departments', 404);
+                return $this->fail('Task not found', 404);
             }
 
-            // Verify employee belongs to managed department
-            $employee = Employee::whereIn('department_id', $managedDepartmentIds)->find($request->employee_id);
+            // Check authorization: user must be either a department manager OR assigned to the project
+            $isDepartmentManager = $this->isDepartmentManager();
+            $isAssignedToProject = Employee::where('id', $user->id)
+                ->whereHas('projectAssignments', function ($query) use ($task) {
+                    $query->where('project_id', $task->project_id)
+                        ->where('department_approval_status', 'approved');
+                })
+                ->exists();
+
+            if (! $isDepartmentManager && ! $isAssignedToProject) {
+                return $this->fail('Access denied. You must be either a department manager or assigned to the project containing this task.', 403);
+            }
+
+            // Additional authorization for department managers - verify task belongs to managed departments
+            if ($isDepartmentManager) {
+                $managedDepartmentIds = $this->getManagedDepartmentIds();
+                $taskInManagedDept = Task::whereIn('department_id', $managedDepartmentIds)->find($request->task_id);
+                if (! $taskInManagedDept) {
+                    return $this->fail('Task not found in your managed departments', 404);
+                }
+            }
+
+            // Verify employee exists and is eligible
+            $employee = Employee::find($request->employee_id);
             if (! $employee) {
-                return $this->fail('Employee not found in your managed departments', 404);
+                return $this->fail('Employee not found', 404);
+            }
+
+            // Additional authorization for department managers - verify employee belongs to managed departments
+            if ($isDepartmentManager) {
+                $managedDepartmentIds = $this->getManagedDepartmentIds();
+                $employeeInManagedDept = Employee::whereIn('department_id', $managedDepartmentIds)->find($request->employee_id);
+                if (! $employeeInManagedDept) {
+                    return $this->fail('Employee not found in your managed departments', 404);
+                }
+            } else {
+                // For non-department managers, verify employee is assigned to the same project
+                $employeeAssignedToProject = Employee::where('id', $request->employee_id)
+                    ->whereHas('projectAssignments', function ($query) use ($task) {
+                        $query->where('project_id', $task->project_id)
+                            ->where('department_approval_status', 'approved');
+                    })
+                    ->exists();
+                if (! $employeeAssignedToProject) {
+                    return $this->fail('Employee is not assigned to this project', 404);
+                }
             }
 
             // Find the assigned task
@@ -438,23 +504,57 @@ class DepartmentManagerController extends Controller
         }
 
         try {
-            if (! $this->isDepartmentManager()) {
-                return $this->fail('Access denied. Department manager role required.', 403);
-            }
+            $user = Auth::user();
 
-            $manager = Auth::user();
-            $managedDepartmentIds = $this->getManagedDepartmentIds();
-
-            // Verify task belongs to managed department
-            $task = Task::whereIn('department_id', $managedDepartmentIds)->find($request->task_id);
+            // Find the task first to check authorization
+            $task = Task::find($request->task_id);
             if (! $task) {
-                return $this->fail('Task not found in your managed departments', 404);
+                return $this->fail('Task not found', 404);
             }
 
-            // Verify employee belongs to managed department
-            $employee = Employee::whereIn('department_id', $managedDepartmentIds)->find($request->employee_id);
+            // Check authorization: user must be either a department manager OR assigned to the project
+            $isDepartmentManager = $this->isDepartmentManager();
+            $isAssignedToProject = Employee::where('id', $user->id)
+                ->whereHas('projectAssignments', function ($query) use ($task) {
+                    $query->where('project_id', $task->project_id)
+                        ->where('department_approval_status', 'approved');
+                })
+                ->exists();
+
+            if (! $isDepartmentManager && ! $isAssignedToProject) {
+                return $this->fail('Access denied. You must be either a department manager or assigned to the project containing this task.', 403);
+            }
+
+            // Verify employee exists and is eligible
+            $employee = Employee::find($request->employee_id);
             if (! $employee) {
-                return $this->fail('Employee not found in your managed departments', 404);
+                return $this->fail('Employee not found', 404);
+            }
+
+            // Additional authorization based on user's role
+            if ($isDepartmentManager) {
+                // Department managers - verify task and employee belong to managed departments
+                $managedDepartmentIds = $this->getManagedDepartmentIds();
+                $taskInManagedDept = Task::whereIn('department_id', $managedDepartmentIds)->find($request->task_id);
+                if (! $taskInManagedDept) {
+                    return $this->fail('Task not found in your managed departments', 404);
+                }
+
+                $employeeInManagedDept = Employee::whereIn('department_id', $managedDepartmentIds)->find($request->employee_id);
+                if (! $employeeInManagedDept) {
+                    return $this->fail('Employee not found in your managed departments', 404);
+                }
+            } else {
+                // Non-department managers - verify employee is assigned to the same project
+                $employeeAssignedToProject = Employee::where('id', $request->employee_id)
+                    ->whereHas('projectAssignments', function ($query) use ($task) {
+                        $query->where('project_id', $task->project_id)
+                            ->where('department_approval_status', 'approved');
+                    })
+                    ->exists();
+                if (! $employeeAssignedToProject) {
+                    return $this->fail('Employee is not assigned to this project', 404);
+                }
             }
 
             // Find the assigned task
@@ -524,7 +624,7 @@ class DepartmentManagerController extends Controller
 
             // Log activities for changed fields
             foreach ($changedFields as $field) {
-                $this->logTaskActivity('assigned', $assignedTask->id, $manager->id, 'updated',
+                $this->logTaskActivity('assigned', $assignedTask->id, $user->id, 'updated',
                     $field, $oldValues[$field], $updateData[$field] ?? null);
             }
 
@@ -780,11 +880,14 @@ class DepartmentManagerController extends Controller
             ]);
         }
 
-        // Update the planned hours
-        $newPlannedHours = $workload->current_planned_hours + $hours;
+        // Recalculate total hours from all assigned tasks excluding blocked tasks
+        // This ensures consistency and handles status changes properly
+        $totalHours = AssignedTask::where('assigned_to', $employeeId)
+            ->where('status', '!=', 'blocked')
+            ->sum('estimated_hours') ?? 0;
 
-        // Ensure planned hours don't go below zero
-        $workload->current_planned_hours = max(0, $newPlannedHours);
+        // Update with calculated total
+        $workload->current_planned_hours = $totalHours;
         $workload->workload_percentage = ($workload->current_planned_hours / $workload->weekly_capacity_hours) * 100;
 
         // Update status based on percentage
@@ -880,11 +983,7 @@ class DepartmentManagerController extends Controller
     public function getManagedEmployeesSimple(Request $request): JsonResponse
     {
         try {
-            if (! $this->isDepartmentManager()) {
-                return $this->fail('Access denied. Department manager role required.', 403);
-            }
-
-            // Validate task_id parameter
+            // Validate task_id parameter first
             $taskId = $request->input('task_id');
             if (! $taskId) {
                 return $this->fail('Task ID is required.', 422);
@@ -896,15 +995,38 @@ class DepartmentManagerController extends Controller
                 return $this->fail('Task not found.', 404);
             }
 
-            $managedDepartmentIds = $this->getManagedDepartmentIds();
+            $user = Auth::user();
+
+            // Check authorization: user must be either a department manager OR assigned to the project
+            $isDepartmentManager = $this->isDepartmentManager();
+            $isAssignedToProject = Employee::where('id', $user->id)
+                ->whereHas('projectAssignments', function ($query) use ($task) {
+                    $query->where('project_id', $task->project_id)
+                        ->where('department_approval_status', 'approved');
+                })
+                ->exists();
+
+            if (! $isDepartmentManager && ! $isAssignedToProject) {
+                return $this->fail('Access denied. You must be either a department manager or assigned to the project containing this task.', 403);
+            }
+
+            // Get appropriate department filter based on user's role
+            $departmentQuery = Employee::where('user_status', 'active');
+
+            if ($isDepartmentManager) {
+                // Department managers can see employees from their managed departments
+                $managedDepartmentIds = $this->getManagedDepartmentIds();
+                $departmentQuery->whereIn('department_id', $managedDepartmentIds);
+            }
+            // If user is only assigned to project (not a department manager),
+            // they can see all employees assigned to the same project (no department restriction)
 
             // Get employees who are:
             // 1. Assigned to the project that contains this task
             // 2. Have approved project assignment status (not pending)
-            // 3. Are in managed departments
+            // 3. Pass department filtering based on user's role
             // 4. Are active
-            $employees = Employee::whereIn('department_id', $managedDepartmentIds)
-                ->where('user_status', 'active')
+            $employees = $departmentQuery
                 ->whereHas('projectAssignments', function ($query) use ($task) {
                     $query->where('project_id', $task->project_id)
                         ->where('department_approval_status', 'approved');
