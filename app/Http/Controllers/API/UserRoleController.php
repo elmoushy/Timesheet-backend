@@ -87,7 +87,7 @@ class UserRoleController extends Controller
 
             // Set assigned_by to current authenticated user if not provided
             if (! isset($validatedData['assigned_by']) && Auth::check()) {
-                $validatedData['assigned_by'] = Auth::id();
+                $validatedData['assigned_by'] = Auth::user()->id;
             }
 
             $userRole = UserRole::create($validatedData);
@@ -275,7 +275,7 @@ class UserRoleController extends Controller
                 'assigned_by' => 'nullable|exists:xxx_employees,id',
             ]);
 
-            $assignedBy = $validatedData['assigned_by'] ?? (Auth::check() ? Auth::id() : null);
+            $assignedBy = $validatedData['assigned_by'] ?? (Auth::check() ? Auth::user()->id : null);
             $userRoles = [];
 
             foreach ($validatedData['role_ids'] as $roleId) {
