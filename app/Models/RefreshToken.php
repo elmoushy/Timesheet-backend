@@ -43,7 +43,11 @@ class RefreshToken extends Model
      */
     public static function createForUser(int $userId, array $metadata = []): self
     {
-        $rawToken = Str::random(config('sso.refresh_token.length', 32));
+        // Generate raw token with configured length
+        $tokenLength = config('sso.refresh_token.length', 32);
+        $rawToken = Str::random($tokenLength);
+
+        // Hash the token for secure storage
         $hashedToken = hash('sha256', $rawToken);
 
         $token = static::create([
@@ -55,23 +59,56 @@ class RefreshToken extends Model
             'expires_at' => now()->addSeconds(config('sso.refresh_token.ttl_seconds', 2592000)),
         ]);
 
-        // Store the raw token temporarily for return
+        // Store the raw token temporarily for return to client
         $token->raw_token = $rawToken;
+
+        \Log::info('Refresh token created', [
+            'user_id' => $userId,
+            'token_id' => $token->id,
+            'raw_token_length' => strlen($rawToken),
+            'expires_at' => $token->expires_at->toDateTimeString()
+        ]);
 
         return $token;
     }
 
     /**
      * Find a valid refresh token
+     * This method handles both properly hashed tokens and legacy tokens stored directly
      */
     public static function findValidToken(string $rawToken): ?self
     {
+        // First, try to find token by hashing the raw token (proper way)
         $hashedToken = hash('sha256', $rawToken);
 
-        return static::where('token', $hashedToken)
+        $token = static::where('token', $hashedToken)
             ->where('is_revoked', false)
             ->where('expires_at', '>', now())
             ->first();
+
+        if ($token) {
+            return $token;
+        }
+
+        // Fallback: Check if the raw token is stored directly (legacy support)
+        // This handles tokens that were incorrectly stored without hashing
+        $legacyToken = static::where('token', $rawToken)
+            ->where('is_revoked', false)
+            ->where('expires_at', '>', now())
+            ->first();
+
+        if ($legacyToken) {
+            // Log this occurrence for monitoring
+            \Log::warning('Found legacy refresh token stored without hashing', [
+                'token_id' => $legacyToken->id,
+                'user_id' => $legacyToken->user_id,
+                'token_length' => strlen($rawToken)
+            ]);
+
+            return $legacyToken;
+        }
+
+        return null;
     }
 
     /**
@@ -115,5 +152,27 @@ class RefreshToken extends Model
     {
         return static::where('expires_at', '<', now())
             ->delete();
+    }
+
+    /**
+     * Identify tokens that might be stored incorrectly (without hashing)
+     * Legacy tokens are typically 64 characters (hex) instead of 32 random chars hashed
+     */
+    public static function findLegacyTokens()
+    {
+        // Find tokens that are 64 characters long and might be stored directly
+        return static::whereRaw('LENGTH(token) = 64')
+            ->where('is_revoked', false)
+            ->where('expires_at', '>', now())
+            ->get();
+    }
+
+    /**
+     * Check if this token appears to be a legacy token (stored without hashing)
+     */
+    public function isLegacyToken(): bool
+    {
+        // Legacy tokens are typically 64 hex characters stored directly
+        return strlen($this->token) === 64 && ctype_xdigit($this->token);
     }
 }
