@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\TaskResource;
 use App\Models\Department;
 use App\Models\Project;
 use App\Models\Task;
@@ -45,7 +46,8 @@ class TaskController extends Controller
     /* ─────────────────────  Index & List  ───────────────────── */
     public function index(Request $request): JsonResponse
     {
-        $query = Task::with(['department', 'project']);
+        // Load only the minimal required relationships
+        $query = Task::with(['department:id,name', 'project:id,project_name,description,department_id,client_id,status,start_date,end_date']);
 
         // Apply search filters if provided
         if ($request->has('search')) {
@@ -72,18 +74,23 @@ class TaskController extends Controller
             $query->where('task_type', $request->input('task_type'));
         }
 
-        return $this->ok(
-            'Tasks fetched successfully',
-            $query->paginate($request->input('per_page', 10))
-        );
+        $tasks = $query->paginate($request->input('per_page', 10));
+
+        // Transform using TaskResource collection
+        $transformedData = $tasks->toArray();
+        $transformedData['data'] = TaskResource::collection($tasks->items())->resolve();
+
+        return $this->ok('Tasks fetched successfully', $transformedData);
     }
 
     public function list(): JsonResponse
     {
-        // Return all tasks for dropdown/select lists (no pagination)
-        $tasks = Task::select('id', 'name', 'task_type', 'project_id')->orderBy('name')->get();
+        // Return all tasks with minimal relationships for dropdown/select lists
+        $tasks = Task::with(['department:id,name', 'project:id,project_name,description,department_id,client_id,status,start_date,end_date'])
+            ->orderBy('name')
+            ->get();
 
-        return $this->ok('All tasks fetched successfully', $tasks);
+        return $this->ok('All tasks fetched successfully', TaskResource::collection($tasks));
     }
 
     /* ─────────────────────  Show  ───────────────────── */

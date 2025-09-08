@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\TimesheetResource;
 use App\Models\DepartmentManager;
 use App\Models\Employee;
 use App\Models\Project;
@@ -315,14 +316,15 @@ class TimesheetController extends Controller
         }
 
         try {
-            $query = Timesheet::with(['rows', 'employee']);
+            // Load only minimal required relationships
+            $query = Timesheet::with(['rows.project:id,project_name', 'rows.task:id,name', 'employee:id,first_name,last_name']);
 
             // Filter by employee's own timesheets by default
             $query->where('employee_id', $employee->id);
 
             // Admin or managers can see all timesheets if specified
             if ($request->has('all') && $request->input('all') && $this->isManagerOrAdmin($employee)) {
-                $query = Timesheet::with(['rows', 'employee']);
+                $query = Timesheet::with(['rows.project:id,project_name', 'rows.task:id,name', 'employee:id,first_name,last_name']);
             }
 
             // Filter by status if provided
@@ -340,15 +342,17 @@ class TimesheetController extends Controller
                 $query->where('period_end', '<=', $request->input('end_date'));
             }
 
-            // Sort by latest first
-            $query->orderBy('period_start', 'desc');
+            $timesheets = $query->orderBy('created_at', 'desc')
+                ->paginate($request->input('per_page', 10));
 
-            // Paginate results
-            $timesheets = $query->paginate($request->input('per_page', 10));
+            // Transform using TimesheetResource collection
+            $transformedData = $timesheets->toArray();
+            $transformedData['data'] = TimesheetResource::collection($timesheets->items())->resolve();
 
-            return $this->ok('Timesheets retrieved successfully', $timesheets);
+            return $this->ok('Timesheets fetched successfully', $transformedData);
+
         } catch (Throwable $e) {
-            return $this->fail('Error retrieving timesheets: '.$e->getMessage(), 500);
+            return $this->fail('Error fetching timesheets: '.$e->getMessage(), 500);
         }
     }
 
@@ -419,12 +423,12 @@ class TimesheetController extends Controller
         }
 
         try {
-            // Find the timesheet with relations
+            // Find the timesheet with minimal required relations
             $timesheet = Timesheet::with([
-                'rows.project',
-                'rows.task',
-                'employee',
-                'approvals.approver',
+                'rows.project:id,project_name',
+                'rows.task:id,name',
+                'employee:id,first_name,last_name,email',
+                'approvals.approver:id,first_name,last_name,email',
                 'chats' => function ($query) {
                     $query->whereNull('parent_id'); // Root chat messages only
                 },
@@ -441,7 +445,7 @@ class TimesheetController extends Controller
                 return $this->fail('You do not have permission to view this timesheet', 403);
             }
 
-            return $this->ok('Timesheet retrieved successfully', $timesheet);
+            return $this->ok('Timesheet retrieved successfully', new TimesheetResource($timesheet));
         } catch (Throwable $e) {
             return $this->fail('Error retrieving timesheet: '.$e->getMessage(), 500);
         }
@@ -852,27 +856,42 @@ class TimesheetController extends Controller
                 $query = Timesheet::whereHas('approvals', function ($query) {
                     $query->where('approver_role', 'pm')
                         ->where('status', 'pending');
-                })->with(['rows.project', 'rows.task', 'employee', 'approvals' => function ($query) {
-                    $query->where('approver_role', 'pm');
-                }]);
+                })->with([
+                    'rows.project:id,project_name',
+                    'rows.task:id,name',
+                    'employee:id,first_name,last_name,email',
+                    'approvals' => function ($query) {
+                        $query->where('approver_role', 'pm')->with('approver:id,first_name,last_name,email');
+                    }
+                ]);
             } elseif ($isProjectManager) {
                 // Project managers see timesheets assigned to them for approval
                 $query = Timesheet::whereHas('approvals', function ($query) use ($employee) {
                     $query->where('approver_id', $employee->id)
                         ->where('approver_role', 'pm')
                         ->where('status', 'pending');
-                })->with(['rows.project', 'rows.task', 'employee', 'approvals' => function ($query) use ($employee) {
-                    $query->where('approver_id', $employee->id);
-                }]);
+                })->with([
+                    'rows.project:id,project_name',
+                    'rows.task:id,name',
+                    'employee:id,first_name,last_name,email',
+                    'approvals' => function ($query) use ($employee) {
+                        $query->where('approver_id', $employee->id)->with('approver:id,first_name,last_name,email');
+                    }
+                ]);
             } else {
                 // Other authenticated users can access but see limited/no data
                 $query = Timesheet::whereHas('approvals', function ($query) use ($employee) {
                     $query->where('approver_id', $employee->id)
                         ->where('approver_role', 'pm')
                         ->where('status', 'pending');
-                })->with(['rows.project', 'rows.task', 'employee', 'approvals' => function ($query) use ($employee) {
-                    $query->where('approver_id', $employee->id);
-                }]);
+                })->with([
+                    'rows.project:id,project_name',
+                    'rows.task:id,name',
+                    'employee:id,first_name,last_name,email',
+                    'approvals' => function ($query) use ($employee) {
+                        $query->where('approver_id', $employee->id)->with('approver:id,first_name,last_name,email');
+                    }
+                ]);
             }
 
             // Sort by latest first
@@ -881,7 +900,11 @@ class TimesheetController extends Controller
             // Paginate results
             $timesheets = $query->paginate($request->input('per_page', 10));
 
-            return $this->ok('PM pending approval timesheets retrieved successfully', $timesheets);
+            // Transform using TimesheetResource collection
+            $transformedData = $timesheets->toArray();
+            $transformedData['data'] = TimesheetResource::collection($timesheets->items())->resolve();
+
+            return $this->ok('PM pending approval timesheets retrieved successfully', $transformedData);
         } catch (Throwable $e) {
             return $this->fail('Error retrieving PM pending approvals: '.$e->getMessage(), 500);
         }

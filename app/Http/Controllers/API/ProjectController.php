@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\ProjectResource;
 use App\Models\Employee;
 use App\Models\Project;
 use App\Models\ProjectEmployeeAssignment;
@@ -71,7 +72,8 @@ class ProjectController extends Controller
     /* ─────────────────────  Index + Show  ───────────────────── */
     public function index(Request $request): JsonResponse
     {
-        $query = Project::with(['client', 'department']);
+        // Only load the minimal relationships needed as per API requirements
+        $query = Project::with(['client:id,name,alias', 'department:id,name']);
 
         // Apply search filters if provided
         if ($request->has('search')) {
@@ -104,21 +106,32 @@ class ProjectController extends Controller
             $query->whereDate('end_date', '<=', $request->input('end_date'));
         }
 
-        return $this->ok('Projects fetched successfully', $query->paginate($request->input('per_page', 10)));
+        $projects = $query->paginate($request->input('per_page', 10));
+
+        // Transform using ProjectResource collection
+        $transformedData = $projects->toArray();
+        $transformedData['data'] = ProjectResource::collection($projects->items())->resolve();
+
+        return $this->ok('Projects fetched successfully', $transformedData);
     }
 
     public function show(int $id): JsonResponse
     {
+        // Load only the needed relationships with specific fields
         $project = Project::with([
-            'client',
-            'department',
-            'managers',
-            'products',
+            'client:id,name,alias',
+            'department:id,name',
+            'manager:id,first_name,last_name',
+            'managers:id,first_name,last_name',
+            'products:id',
             'contactNumbers',
-            'tasks', // Add tasks relationship
         ])->find($id);
 
-        return $project ? $this->ok('Project fetched successfully', $project) : $this->fail('Project not found', 404);
+        if (!$project) {
+            return $this->fail('Project not found', 404);
+        }
+
+        return $this->ok('Project fetched successfully', new ProjectResource($project));
     }
 
     /* ─────────────────────  Store  ───────────────────── */

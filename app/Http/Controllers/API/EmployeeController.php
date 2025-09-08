@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\EmployeeResource;
 use App\Models\EmpEmergContact;
 use App\Models\Employee;
 use App\Models\EmpPhone;
@@ -81,7 +82,7 @@ class EmployeeController extends Controller
             'id_type' => 'required|in:national_id,passport,driving_license',
             'id_number' => 'required|string|max:60',
             'id_expiry_date' => 'required|date',
-            'employee_type' => 'required|in:full_time,part_time,contractor,intern',
+            'employee_type' => 'required|string',
             'job_title' => 'required|string|max:120',
             'designation' => 'nullable|string|max:120',
             'grade_level' => 'nullable|string|max:60',
@@ -326,18 +327,8 @@ class EmployeeController extends Controller
         // Get the results - limit to reasonable amount for dropdown
         $results = $query->limit(50)->get();
 
-        // Format results for dropdown with display text and value
-        $formattedResults = $results->map(function ($employee) {
-            return [
-                'id' => $employee->id,
-                'first_name' => $employee->first_name,
-                'last_name' => $employee->last_name,
-                'job_title' => $employee->job_title,
-                'display_text' => $employee->first_name.' '.$employee->last_name.' ('.$employee->job_title.')',
-            ];
-        });
-
-        return $this->ok('Employee search results', $formattedResults);
+        // Use EmployeeResource to ensure consistent formatting
+        return $this->ok('Employee search results', EmployeeResource::collection($results));
     }
 
     /**

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\ClientResource;
 use App\Models\Client;
 use App\Models\ClientNumber;
 use Illuminate\Http\JsonResponse;
@@ -67,27 +68,30 @@ class ClientController extends Controller
             $query->where('region', $request->input('region'));
         }
 
-        return $this->ok(
-            'Clients fetched successfully',
-            $query->paginate($request->input('per_page', 10))
-        );
+        $clients = $query->paginate($request->input('per_page', 10));
+
+        // Transform using ClientResource collection
+        $transformedData = $clients->toArray();
+        $transformedData['data'] = ClientResource::collection($clients->items())->resolve();
+
+        return $this->ok('Clients fetched successfully', $transformedData);
     }
 
     public function list(): JsonResponse
     {
-        // Return all clients for dropdown/select lists (no pagination)
-        $clients = Client::with('contactNumbers')->select('id', 'name', 'alias')->orderBy('name')->get();
+        // Return all clients for dropdown/select lists with minimal relationships
+        $clients = Client::with('contactNumbers')->orderBy('name')->get();
 
-        return $this->ok('All clients fetched successfully', $clients);
+        return $this->ok('All clients fetched successfully', ClientResource::collection($clients));
     }
 
     /* ─────────────────────  Show  ───────────────────── */
     public function show(int $id): JsonResponse
     {
-        $client = Client::with(['projects', 'contactNumbers'])->find($id);
+        $client = Client::with('contactNumbers')->find($id);
 
         return $client
-            ? $this->ok('Client fetched successfully', $client)
+            ? $this->ok('Client fetched successfully', new ClientResource($client))
             : $this->fail('Client not found', 404);
     }
 

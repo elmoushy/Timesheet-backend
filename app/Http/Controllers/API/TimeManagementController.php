@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\TimeManagementDashboardResource;
 use App\Models\AssignedTask;
 use App\Models\EmployeeProductivityAnalytics;
 use App\Models\PersonalTask;
@@ -41,38 +42,46 @@ class TimeManagementController extends Controller
                 return $this->fail('Unauthorized access', 401);
             }
 
-            // Get personal tasks
+            // Get personal tasks - only essential fields loaded
             $personalTasks = PersonalTask::where('employee_id', $employee->id)
                 ->orderBy('is_pinned', 'desc')
                 ->orderBy('due_date', 'asc')
                 ->get();
 
-            // Get project tasks
+            // Get project tasks - with minimal relationships
             $projectTasks = ProjectTask::where('employee_id', $employee->id)
-                ->with(['projectAssignment.project'])
+                ->with(['projectAssignment.project:id,project_name,description'])
                 ->orderBy('is_pinned', 'desc')
                 ->orderBy('due_date', 'asc')
                 ->get();
 
-            // Get assigned tasks
+            // Get assigned tasks - with minimal relationships
             $assignedTasks = AssignedTask::where('assigned_to', $employee->id)
-                ->with(['task', 'assignedBy'])
+                ->with([
+                    'task:id,name,title,description',
+                    'assignedBy:id,first_name,last_name'
+                ])
                 ->orderBy('is_pinned', 'desc')
                 ->orderBy('due_date', 'asc')
                 ->get();
 
-            // Get important tasks from all categories
+            // Get important tasks from all categories (filtered collections)
             $importantTasks = [
                 'personal' => $personalTasks->where('is_important', true)->values(),
                 'project' => $projectTasks->where('is_important', true)->values(),
                 'assigned' => $assignedTasks->where('is_important', true)->values(),
             ];
 
-            // Get recent analytics
+            // Get recent analytics - limited fields
             $analytics = EmployeeProductivityAnalytics::where('employee_id', $employee->id)
                 ->orderBy('date', 'desc')
                 ->take(7)
                 ->get();
+
+            // Calculate additional analytics data
+            $totalTasksCompleted = $analytics->sum('tasks_completed');
+            $totalHoursLogged = $analytics->sum('hours_logged');
+            $avgDailyTasks = $analytics->count() > 0 ? round($analytics->avg('tasks_completed'), 2) : 0;
 
             $dashboard = [
                 'personal_tasks' => $personalTasks,
@@ -82,7 +91,12 @@ class TimeManagementController extends Controller
                 'analytics' => [
                     'current_streak' => $analytics->first()->streak_days ?? 0,
                     'max_streak' => $analytics->max('max_streak') ?? 0,
+                    'total_tasks_completed' => $totalTasksCompleted,
+                    'total_hours_logged' => $totalHoursLogged,
+                    'average_daily_tasks' => $avgDailyTasks,
+                    'productivity_trend' => $this->calculateProductivityTrend($analytics),
                     'weekly_data' => $analytics->reverse()->values(),
+                    'daily_data' => $this->getDailyAnalytics($employee->id),
                 ],
                 'summary' => [
                     'total_tasks' => $personalTasks->count() + $projectTasks->count() + $assignedTasks->count(),
@@ -92,7 +106,7 @@ class TimeManagementController extends Controller
                 ],
             ];
 
-            return $this->ok('Employee dashboard retrieved successfully', $dashboard);
+            return $this->ok('Employee dashboard retrieved successfully', new TimeManagementDashboardResource($dashboard));
 
         } catch (Throwable $e) {
             return $this->fail('Error retrieving dashboard: '.$e->getMessage(), 500);
@@ -1111,6 +1125,26 @@ class TimeManagementController extends Controller
             ->where('status', '!=', 'done')
             ->whereBetween('due_date', [$startOfWeek, $endOfWeek])
             ->count();
+    }
+
+    private function getDailyAnalytics(int $employeeId): array
+    {
+        // Get daily data for the API requirement, mapping from weekly data for now
+        $analytics = EmployeeProductivityAnalytics::where('employee_id', $employeeId)
+            ->orderBy('date', 'desc')
+            ->take(30)
+            ->get();
+
+        return $analytics->map(function ($item) {
+            return [
+                'date' => $item->date,
+                'tasks_completed' => $item->tasks_completed,
+                'tasks_created' => $item->tasks_created,
+                'total_progress_points' => $item->total_progress_points,
+                'hours_logged' => $item->hours_logged,
+                'streak_days' => $item->streak_days,
+            ];
+        })->toArray();
     }
 
     private function logTaskActivity(string $taskType, int $taskId, int $employeeId, string $action, ?string $field = null, ?string $oldValue = null, ?string $newValue = null): void
