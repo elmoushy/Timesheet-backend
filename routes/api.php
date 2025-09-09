@@ -11,7 +11,7 @@ use App\Http\Controllers\API\PageRolePermissionController;
 use App\Http\Controllers\API\ProjectAssignEmployeeController;
 use App\Http\Controllers\API\ProjectController;
 use App\Http\Controllers\API\RoleController;
-use App\Http\Controllers\Api\SsoController;
+use App\Http\Controllers\API\SsoController;
 use App\Http\Controllers\API\SupportController;
 use App\Http\Controllers\API\TaskController;
 use App\Http\Controllers\API\TestController;
