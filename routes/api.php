@@ -74,6 +74,7 @@ Route::prefix('support')->middleware('jwt.auth')->group(function () {
 // Department routes - all require authentication
 Route::prefix('departments')->middleware('jwt.auth')->group(function () {
     Route::get('/', [DepartmentController::class, 'index']);
+    Route::get('/list', [ApplicationController::class, 'departmentList']); // For dropdowns
     Route::get('/search', [DepartmentController::class, 'search']); // New route for dropdown search
     Route::get('/{id}', [DepartmentController::class, 'show']);
     Route::post('/', [DepartmentController::class, 'store']);
@@ -122,6 +123,7 @@ Route::prefix('tasks')->middleware('jwt.auth')->group(function () {
     Route::get('/list', [TaskController::class, 'list']);
     Route::get('/search', [TaskController::class, 'search']);
     Route::get('/departments', [TaskController::class, 'departmentList']);
+    Route::get('/projects', [TaskController::class, 'projectList']); // For project dropdown filtered by department
     Route::get('/{id}', [TaskController::class, 'show']);
 
     // New route to get tasks by project
@@ -191,6 +193,9 @@ Route::middleware('jwt.auth')->group(function () {
     Route::prefix('timesheets')->group(function () {
         // Get all timesheets (employee's own)
         Route::get('/', [TimesheetController::class, 'index']);
+
+        // Get filter options for dropdowns
+        Route::get('/filter-options', [TimesheetController::class, 'filterOptions']);
 
         // Get reopened timesheets
         Route::get('/reopened', [TimesheetController::class, 'reopenedList']);
@@ -411,4 +416,48 @@ Route::prefix('test')->middleware('jwt.auth')->group(function () {
     Route::get('/utf8', [TestController::class, 'testUtf8']);
     Route::get('/binary', [TestController::class, 'testBinary']);
     Route::get('/memory', [TestController::class, 'testMemory']);
+});
+
+// =====================================
+// Expense Management Routes - require authentication
+// =====================================
+Route::prefix('expenses')->middleware('jwt.auth')->group(function () {
+    // Employee expense page endpoints
+    Route::get('/', [App\Http\Controllers\API\ExpenseController::class, 'index']);
+    Route::post('/', [App\Http\Controllers\API\ExpenseController::class, 'store']);
+    Route::get('/{expense}', [App\Http\Controllers\API\ExpenseController::class, 'show'])
+        ->whereNumber('expense');
+    Route::put('/{expense}', [App\Http\Controllers\API\ExpenseController::class, 'update'])
+        ->whereNumber('expense');
+    Route::delete('/{expense}', [App\Http\Controllers\API\ExpenseController::class, 'destroy'])
+        ->whereNumber('expense');
+    Route::post('/{expense}/submit', [App\Http\Controllers\API\ExpenseController::class, 'submit'])
+        ->whereNumber('expense');
+    Route::post('/draft', [App\Http\Controllers\API\ExpenseController::class, 'saveDraft']);
+
+    // Reviewer expense page endpoints
+    Route::get('/review', [App\Http\Controllers\API\ExpenseController::class, 'getForReview']);
+    Route::get('/{expense}/review', [App\Http\Controllers\API\ExpenseController::class, 'getForReviewSingle'])
+        ->whereNumber('expense');
+    Route::post('/{expense}/approve', [App\Http\Controllers\API\ExpenseController::class, 'approve'])
+        ->whereNumber('expense');
+    Route::post('/{expense}/reject', [App\Http\Controllers\API\ExpenseController::class, 'reject'])
+        ->whereNumber('expense');
+    Route::post('/{expense}/return', [App\Http\Controllers\API\ExpenseController::class, 'returnForEdit'])
+        ->whereNumber('expense');
+});
+
+// File Management Routes - require authentication
+Route::prefix('files')->middleware('jwt.auth')->group(function () {
+    Route::post('/upload', [App\Http\Controllers\API\FileController::class, 'upload']);
+
+    // BLOB-based file download routes
+    Route::get('/expense-items/{expenseItemId}/attachment', [App\Http\Controllers\API\FileController::class, 'downloadExpenseItemAttachment'])
+        ->whereNumber('expenseItemId');
+    Route::get('/expense-items/{expenseItemId}/attachment/info', [App\Http\Controllers\API\FileController::class, 'getExpenseItemAttachmentInfo'])
+        ->whereNumber('expenseItemId');
+
+    // Legacy routes (kept for compatibility)
+    Route::get('/{filename}', [App\Http\Controllers\API\FileController::class, 'show']);
+    Route::delete('/{filename}', [App\Http\Controllers\API\FileController::class, 'delete']);
 });

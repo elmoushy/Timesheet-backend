@@ -89,4 +89,12 @@ class Project extends Model
     {
         return $this->hasMany(ProjectEmployeeAssignment::class, 'project_id');
     }
+
+    /**
+     * Get timesheet rows for this project
+     */
+    public function timesheetRows()
+    {
+        return $this->hasMany(TimesheetRow::class, 'project_id');
+    }
 }

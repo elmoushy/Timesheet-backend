@@ -47,9 +47,19 @@ class DepartmentController extends Controller
     }
 
     /* ─────────────────────  Index + Show  ───────────────────── */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        return $this->ok('Departments fetched successfully', Department::with('managers')->paginate(10));
+        $query = Department::with('managers');
+
+        // Apply search filters if provided
+        if ($request->has('search')) {
+            $searchTerm = '%'.$request->input('search').'%';
+            $query->where('name', 'LIKE', $searchTerm);
+        }
+
+        $departments = $query->paginate($request->input('per_page', 10));
+
+        return $this->ok('Departments fetched successfully', $departments);
     }
 
     public function show(int $id): JsonResponse

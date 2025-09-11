@@ -61,6 +61,7 @@ class Kernel extends HttpKernel
         'cors' => \App\Http\Middleware\Cors::class,
         'guest' => \App\Http\Middleware\RedirectIfAuthenticated::class,
         'jwt.auth' => \App\Http\Middleware\JwtAuthMiddleware::class,
+        'expense.reviewer' => \App\Http\Middleware\ExpenseReviewerMiddleware::class,
         'password.confirm' => \Illuminate\Auth\Middleware\RequirePassword::class,
         'precognitive' => \Illuminate\Foundation\Http\Middleware\HandlePrecognitiveRequests::class,
         'signed' => \App\Http\Middleware\ValidateSignature::class,

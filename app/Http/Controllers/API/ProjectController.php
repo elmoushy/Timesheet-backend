@@ -97,6 +97,11 @@ class ProjectController extends Controller
             $query->where('department_id', $request->input('department_id'));
         }
 
+        // Apply status filter if provided
+        if ($request->has('status')) {
+            $query->where('status', $request->input('status'));
+        }
+
         // Apply date filters if provided and not empty
         if ($request->filled('start_date')) {
             $query->whereDate('start_date', '>=', $request->input('start_date'));

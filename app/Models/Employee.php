@@ -675,6 +675,22 @@ class Employee extends Authenticatable
     }
 
     /**
+     * Get the expenses for the employee.
+     */
+    public function expenses()
+    {
+        return $this->hasMany(Expense::class, 'employee_id');
+    }
+
+    /**
+     * Get the expenses reviewed by this employee.
+     */
+    public function reviewedExpenses()
+    {
+        return $this->hasMany(Expense::class, 'reviewer_id');
+    }
+
+    /**
      * Find user by external identity
      */
     public static function findByExternalIdentity(string $provider, string $externalId): ?self

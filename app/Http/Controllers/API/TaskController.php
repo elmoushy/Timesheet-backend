@@ -301,4 +301,44 @@ class TaskController extends Controller
             return $this->fail('Error retrieving department projects: '.$e->getMessage(), 500);
         }
     }
+
+    /**
+     * Get projects list for dropdown (filtered by department if provided)
+     */
+    public function projectList(Request $request): JsonResponse
+    {
+        try {
+            $query = Project::query()
+                ->select('id', 'project_name', 'description', 'department_id', 'client_id', 'status', 'start_date', 'end_date')
+                ->with('client:id,name');
+
+            // Apply department filter if provided
+            if ($request->has('department_id')) {
+                $query->where('department_id', $request->input('department_id'));
+            }
+
+            // Apply search term if provided
+            if ($request->has('term')) {
+                $searchTerm = '%'.$request->input('term').'%';
+                $query->where('project_name', 'LIKE', $searchTerm);
+            }
+
+            $projects = $query->orderBy('project_name')->get();
+
+            // Format results for dropdown
+            $formattedResults = $projects->map(function ($project) {
+                return [
+                    'id' => $project->id,
+                    'project_name' => $project->project_name,
+                    'description' => $project->description,
+                    'client_name' => $project->client ? $project->client->name : '',
+                    'display_text' => $project->project_name . ($project->client ? ' (' . $project->client->name . ')' : ''),
+                ];
+            });
+
+            return $this->ok('Project list retrieved successfully', $formattedResults);
+        } catch (Throwable $e) {
+            return $this->fail('Error retrieving project list: '.$e->getMessage(), 500);
+        }
+    }
 }

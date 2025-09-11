@@ -68,6 +68,11 @@ class ClientController extends Controller
             $query->where('region', $request->input('region'));
         }
 
+        // Apply business sector filter if provided
+        if ($request->has('business_sector')) {
+            $query->where('business_sector', $request->input('business_sector'));
+        }
+
         $clients = $query->paginate($request->input('per_page', 10));
 
         // Transform using ClientResource collection

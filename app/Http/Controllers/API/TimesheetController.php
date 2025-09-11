@@ -4,6 +4,8 @@ namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\TimesheetResource;
+use App\Models\Client;
+use App\Models\Department;
 use App\Models\DepartmentManager;
 use App\Models\Employee;
 use App\Models\Project;
@@ -315,44 +317,220 @@ class TimesheetController extends Controller
             return $this->fail('Unauthorized access', 401);
         }
 
+        // Validate request parameters
+        $validator = Validator::make($request->all(), [
+            'page' => 'integer|min:1|max:1000',
+            'per_page' => 'integer|min:10|max:100',
+            'search' => 'nullable|string|max:255',
+            'status' => 'nullable|string|in:draft,submitted,approved,rejected,reopened,in_review',
+            'start_date' => 'nullable|date_format:Y-m-d',
+            'end_date' => 'nullable|date_format:Y-m-d|after_or_equal:start_date',
+            'employee_id' => 'nullable|integer|exists:xxx_employees,id',
+            'department_id' => 'nullable|integer|exists:xxx_departments,id',
+            'project_id' => 'nullable|integer|exists:xxx_projects,id',
+            'client_id' => 'nullable|integer|exists:xxx_clients,id',
+            'sort_by' => 'nullable|string|in:period_start,period_end,total_hours,overall_status,employee_name,created_at,updated_at,submitted_at',
+            'sort_order' => 'nullable|string|in:asc,desc',
+            'is_reopen_tab' => 'nullable|boolean',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->fail($validator->errors()->first(), 422);
+        }
+
         try {
-            // Load only minimal required relationships
-            $query = Timesheet::with(['rows.project:id,project_name', 'rows.task:id,name', 'employee:id,first_name,last_name']);
+            // Check if user has permission to view all timesheets
+            $canViewAll = $this->isManagerOrAdmin($employee);
+            $isDepartmentManager = $this->isDepartmentManager($employee);
 
-            // Filter by employee's own timesheets by default
-            $query->where('employee_id', $employee->id);
+            // Start building the query with optimized relationships
+            $query = Timesheet::with([
+                'employee:id,first_name,last_name,employee_code,work_email,department_id',
+                'employee.department:id,name',
+                'rows.project:id,project_name,department_id,client_id',
+                'rows.project.client:id,name',
+                'rows.task:id,name,task_type',
+                'approvals:id,timesheet_id,approver_role,status,acted_at',
+                'chats:id,timesheet_id'
+            ]);
 
-            // Admin or managers can see all timesheets if specified
-            if ($request->has('all') && $request->input('all') && $this->isManagerOrAdmin($employee)) {
-                $query = Timesheet::with(['rows.project:id,project_name', 'rows.task:id,name', 'employee:id,first_name,last_name']);
+            // Apply user-based filtering
+            if (!$canViewAll) {
+                if ($isDepartmentManager) {
+                    // Department managers can see timesheets from their managed departments
+                    $managedDepartmentIds = DepartmentManager::where('employee_id', $employee->id)
+                        ->where('is_active', true)
+                        ->pluck('department_id');
+
+                    $query->whereHas('employee', function ($q) use ($managedDepartmentIds, $employee) {
+                        $q->where(function ($subQ) use ($managedDepartmentIds, $employee) {
+                            $subQ->whereIn('department_id', $managedDepartmentIds)
+                                ->orWhere('id', $employee->id); // Include own timesheets
+                        });
+                    });
+                } else {
+                    // Regular employees can only see their own timesheets
+                    $query->where('employee_id', $employee->id);
+                }
             }
 
-            // Filter by status if provided
-            if ($request->has('status') && $request->input('status')) {
-                $status = $request->input('status');
-                $query->where('overall_status', $status);
+            // Apply explicit filters if user has permission
+            if ($request->filled('employee_id') && $canViewAll) {
+                $query->where('employee_id', $request->input('employee_id'));
             }
 
-            // Filter by date range if provided
-            if ($request->has('start_date') && $request->input('start_date')) {
-                $query->where('period_start', '>=', $request->input('start_date'));
+            if ($request->filled('department_id') && ($canViewAll || $isDepartmentManager)) {
+                $query->whereHas('employee', function ($q) use ($request) {
+                    $q->where('department_id', $request->input('department_id'));
+                });
             }
 
-            if ($request->has('end_date') && $request->input('end_date')) {
-                $query->where('period_end', '<=', $request->input('end_date'));
+            // Apply search filter - multi-field search
+            if ($request->filled('search')) {
+                $searchTerm = '%' . trim($request->input('search')) . '%';
+                $query->where(function ($q) use ($searchTerm) {
+                    $q->whereHas('employee', function ($employeeQ) use ($searchTerm) {
+                        $employeeQ->whereRaw("LOWER(CONCAT(first_name, ' ', last_name)) LIKE LOWER(?)", [$searchTerm])
+                            ->orWhereRaw("LOWER(employee_code) LIKE LOWER(?)", [$searchTerm])
+                            ->orWhereRaw("LOWER(work_email) LIKE LOWER(?)", [$searchTerm]);
+                    })
+                    ->orWhereHas('rows.project', function ($projectQ) use ($searchTerm) {
+                        $projectQ->whereRaw("LOWER(project_name) LIKE LOWER(?)", [$searchTerm]);
+                    })
+                    ->orWhereHas('rows.project.client', function ($clientQ) use ($searchTerm) {
+                        $clientQ->whereRaw("LOWER(name) LIKE LOWER(?)", [$searchTerm]);
+                    })
+                    ->orWhereRaw("LOWER(overall_status) LIKE LOWER(?)", [$searchTerm])
+                    ->orWhereRaw("DATE_FORMAT(period_start, '%Y-%m-%d') LIKE ?", [$searchTerm])
+                    ->orWhereRaw("DATE_FORMAT(period_end, '%Y-%m-%d') LIKE ?", [$searchTerm]);
+                });
             }
 
-            $timesheets = $query->orderBy('created_at', 'desc')
-                ->paginate($request->input('per_page', 10));
+            // Apply status filter
+            if ($request->filled('status')) {
+                $query->where('overall_status', $request->input('status'));
+            }
 
-            // Transform using TimesheetResource collection
+            // Apply date range filters
+            if ($request->filled('start_date')) {
+                $query->where('period_end', '>=', $request->input('start_date'));
+            }
+
+            if ($request->filled('end_date')) {
+                $query->where('period_start', '<=', $request->input('end_date'));
+            }
+
+            // Apply project filter
+            if ($request->filled('project_id')) {
+                $query->whereHas('rows', function ($q) use ($request) {
+                    $q->where('project_id', $request->input('project_id'));
+                });
+            }
+
+            // Apply client filter
+            if ($request->filled('client_id')) {
+                $query->whereHas('rows.project', function ($q) use ($request) {
+                    $q->where('client_id', $request->input('client_id'));
+                });
+            }
+
+            // Apply reopen tab filter
+            if ($request->boolean('is_reopen_tab')) {
+                $query->where('overall_status', 'reopened');
+            }
+
+            // Apply sorting
+            $sortBy = $request->input('sort_by', 'created_at');
+            $sortOrder = $request->input('sort_order', 'desc');
+
+            switch ($sortBy) {
+                case 'employee_name':
+                    $query->join('xxx_employees as emp', 'xxx_timesheets.employee_id', '=', 'emp.id')
+                        ->orderByRaw("CONCAT(emp.first_name, ' ', emp.last_name) $sortOrder")
+                        ->select('xxx_timesheets.*');
+                    break;
+                case 'period_start':
+                case 'period_end':
+                case 'overall_status':
+                case 'created_at':
+                case 'updated_at':
+                case 'submitted_at':
+                    $query->orderBy($sortBy, $sortOrder);
+                    break;
+                case 'total_hours':
+                    // Calculate total hours on the fly
+                    $query->leftJoin('xxx_timesheet_rows as tr', 'xxx_timesheets.id', '=', 'tr.timesheet_id')
+                        ->groupBy('xxx_timesheets.id')
+                        ->orderByRaw("SUM(
+                            tr.hours_monday + tr.hours_tuesday + tr.hours_wednesday +
+                            tr.hours_thursday + tr.hours_friday + tr.hours_saturday + tr.hours_sunday
+                        ) $sortOrder")
+                        ->select('xxx_timesheets.*');
+                    break;
+                default:
+                    $query->orderBy('created_at', 'desc');
+            }
+
+            // Get paginated results
+            $perPage = $request->input('per_page', 20);
+            $timesheets = $query->paginate($perPage);
+
+            // Transform using enhanced TimesheetResource
             $transformedData = $timesheets->toArray();
-            $transformedData['data'] = TimesheetResource::collection($timesheets->items())->resolve();
+            $enhancedData = [];
+
+            foreach ($timesheets->items() as $timesheet) {
+                $timesheetData = (new TimesheetResource($timesheet))->resolve();
+
+                // Add enhanced fields
+                $timesheetData['employee_name'] = $timesheet->employee
+                    ? $timesheet->employee->first_name . ' ' . $timesheet->employee->last_name
+                    : '';
+
+                $timesheetData['department_id'] = $timesheet->employee->department_id ?? null;
+                $timesheetData['department_name'] = $timesheet->employee->department->name ?? '';
+
+                // Get primary project and client info
+                $primaryRow = $timesheet->rows->first();
+                if ($primaryRow) {
+                    $timesheetData['project_id'] = $primaryRow->project_id;
+                    $timesheetData['project_name'] = $primaryRow->project->project_name ?? '';
+                    $timesheetData['client_id'] = $primaryRow->project->client_id ?? null;
+                    $timesheetData['client_name'] = $primaryRow->project->client->name ?? '';
+                }
+
+                // Calculate total hours
+                $totalHours = $timesheet->rows->sum(function ($row) {
+                    return $row->hours_monday + $row->hours_tuesday + $row->hours_wednesday +
+                           $row->hours_thursday + $row->hours_friday + $row->hours_saturday + $row->hours_sunday;
+                });
+                $timesheetData['total_hours'] = $totalHours;
+
+                // Get workflow information
+                $timesheetData['current_stage'] = $this->getCurrentStage($timesheet);
+                $timesheetData['workflow_step'] = $this->getWorkflowStep($timesheet);
+
+                // Additional metadata
+                $timesheetData['comments_count'] = $timesheet->chats->count();
+                $timesheetData['has_attachments'] = false; // TODO: implement attachment check
+                $timesheetData['is_editable'] = $this->canEditTimesheet($timesheet, $employee);
+
+                // Add approval timestamps
+                $approvedApproval = $timesheet->approvals->where('status', 'approved')->first();
+                $timesheetData['approved_at'] = $approvedApproval ? $approvedApproval->acted_at : null;
+
+                $enhancedData[] = $timesheetData;
+            }
+
+            $transformedData['data'] = $enhancedData;
+
+            // Add current filters to response
+            $transformedData['filters'] = $request->only(['search', 'status', 'start_date', 'end_date']);
 
             return $this->ok('Timesheets fetched successfully', $transformedData);
 
         } catch (Throwable $e) {
-            return $this->fail('Error fetching timesheets: '.$e->getMessage(), 500);
+            return $this->fail('Error fetching timesheets: ' . $e->getMessage(), 500);
         }
     }
 
@@ -1088,6 +1266,163 @@ class TimesheetController extends Controller
         return in_array(strtolower($employee->role->name), ['admin', 'manager', 'hr', 'gm', 'ceo']);
     }
 
+    /* ─────────────────────  Filter Options Endpoint  ───────────────────── */
+    public function filterOptions(Request $request): JsonResponse
+    {
+        $employee = Auth::user();
+        if (!$employee) {
+            return $this->fail('Unauthorized access', 401);
+        }
+
+        try {
+            $canViewAll = $this->isManagerOrAdmin($employee);
+            $isDepartmentManager = $this->isDepartmentManager($employee);
+
+            // Get available statuses with counts
+            $statusQuery = Timesheet::select('overall_status', DB::raw('count(*) as count'));
+
+            if (!$canViewAll) {
+                if ($isDepartmentManager) {
+                    $managedDepartmentIds = DepartmentManager::where('employee_id', $employee->id)
+                        ->where('is_active', true)
+                        ->pluck('department_id');
+
+                    $statusQuery->whereHas('employee', function ($q) use ($managedDepartmentIds, $employee) {
+                        $q->where(function ($subQ) use ($managedDepartmentIds, $employee) {
+                            $subQ->whereIn('department_id', $managedDepartmentIds)
+                                ->orWhere('id', $employee->id);
+                        });
+                    });
+                } else {
+                    $statusQuery->where('employee_id', $employee->id);
+                }
+            }
+
+            $statuses = $statusQuery->groupBy('overall_status')->get()->map(function ($status) {
+                return [
+                    'value' => $status->overall_status,
+                    'label' => ucfirst(str_replace('_', ' ', $status->overall_status)),
+                    'count' => $status->count
+                ];
+            });
+
+            // Get employees (if user has permission)
+            $employees = collect();
+            if ($canViewAll || $isDepartmentManager) {
+                $employeeQuery = Employee::select('id', 'first_name', 'last_name', 'employee_code', 'department_id')
+                    ->with('department:id,name');
+
+                if (!$canViewAll && $isDepartmentManager) {
+                    $managedDepartmentIds = DepartmentManager::where('employee_id', $employee->id)
+                        ->where('is_active', true)
+                        ->pluck('department_id');
+
+                    $employeeQuery->where(function ($q) use ($managedDepartmentIds, $employee) {
+                        $q->whereIn('department_id', $managedDepartmentIds)
+                            ->orWhere('id', $employee->id);
+                    });
+                }
+
+                $employees = $employeeQuery->get()->map(function ($emp) {
+                    return [
+                        'id' => $emp->id,
+                        'name' => $emp->first_name . ' ' . $emp->last_name,
+                        'employee_code' => $emp->employee_code,
+                        'department' => $emp->department->name ?? ''
+                    ];
+                });
+            }
+
+            // Get projects (based on user's accessible timesheets)
+            $projectQuery = Project::select('id', 'project_name', 'client_id')
+                ->with('client:id,name')
+                ->whereHas('timesheetRows.timesheet', function ($q) use ($employee, $canViewAll, $isDepartmentManager) {
+                    if (!$canViewAll) {
+                        if ($isDepartmentManager) {
+                            $managedDepartmentIds = DepartmentManager::where('employee_id', $employee->id)
+                                ->where('is_active', true)
+                                ->pluck('department_id');
+
+                            $q->whereHas('employee', function ($subQ) use ($managedDepartmentIds, $employee) {
+                                $subQ->where(function ($innerQ) use ($managedDepartmentIds, $employee) {
+                                    $innerQ->whereIn('department_id', $managedDepartmentIds)
+                                        ->orWhere('id', $employee->id);
+                                });
+                            });
+                        } else {
+                            $q->where('employee_id', $employee->id);
+                        }
+                    }
+                });
+
+            $projects = $projectQuery->get()->map(function ($project) {
+                return [
+                    'id' => $project->id,
+                    'name' => $project->project_name,
+                    'client_name' => $project->client->name ?? ''
+                ];
+            });
+
+            // Get clients (from accessible projects)
+            $clients = $projects->where('client_name', '!=', '')
+                ->unique('client_name')
+                ->map(function ($project) {
+                    return [
+                        'name' => $project['client_name']
+                    ];
+                })
+                ->values();
+
+            // Get departments (if user has permission)
+            $departments = collect();
+            if ($canViewAll || $isDepartmentManager) {
+                $departments = Department::select('id', 'name')->get();
+            }
+
+            // Get date range
+            $dateQuery = Timesheet::select(
+                DB::raw('MIN(period_start) as min_date'),
+                DB::raw('MAX(period_end) as max_date')
+            );
+
+            if (!$canViewAll) {
+                if ($isDepartmentManager) {
+                    $managedDepartmentIds = DepartmentManager::where('employee_id', $employee->id)
+                        ->where('is_active', true)
+                        ->pluck('department_id');
+
+                    $dateQuery->whereHas('employee', function ($q) use ($managedDepartmentIds, $employee) {
+                        $q->where(function ($subQ) use ($managedDepartmentIds, $employee) {
+                            $subQ->whereIn('department_id', $managedDepartmentIds)
+                                ->orWhere('id', $employee->id);
+                        });
+                    });
+                } else {
+                    $dateQuery->where('employee_id', $employee->id);
+                }
+            }
+
+            $dateRange = $dateQuery->first();
+
+            $filterOptions = [
+                'statuses' => $statuses,
+                'employees' => $employees,
+                'projects' => $projects,
+                'clients' => $clients,
+                'departments' => $departments,
+                'date_ranges' => [
+                    'min_date' => $dateRange->min_date,
+                    'max_date' => $dateRange->max_date
+                ]
+            ];
+
+            return $this->ok('Filter options retrieved successfully', $filterOptions);
+
+        } catch (Throwable $e) {
+            return $this->fail('Error retrieving filter options: ' . $e->getMessage(), 500);
+        }
+    }
+
     /**
      * Add a record to the workflow history
      */
@@ -1226,5 +1561,69 @@ class TimesheetController extends Controller
         }
 
         return 'gm';
+    }
+
+    /**
+     * Check if employee is a department manager
+     */
+    private function isDepartmentManager(Employee $employee): bool
+    {
+        return DepartmentManager::where('employee_id', $employee->id)
+            ->where('is_active', true)
+            ->exists();
+    }
+
+    /**
+     * Get current workflow stage
+     */
+    private function getCurrentStage(Timesheet $timesheet): string
+    {
+        switch ($timesheet->overall_status) {
+            case 'draft':
+            case 'reopened':
+                return 'employee';
+            case 'submitted':
+                return 'in_review';
+            case 'approved':
+                return 'approved';
+            case 'rejected':
+                return 'rejected';
+            case 'in_review':
+                // Check latest approval stage
+                $latestApproval = $timesheet->approvals()
+                    ->where('status', 'pending')
+                    ->orderBy('created_at', 'desc')
+                    ->first();
+
+                return $latestApproval ? $latestApproval->approver_role : 'pm';
+            default:
+                return 'employee';
+        }
+    }
+
+    /**
+     * Get workflow step number
+     */
+    private function getWorkflowStep(Timesheet $timesheet): int
+    {
+        $approvedCount = $timesheet->approvals()
+            ->where('status', 'approved')
+            ->count();
+
+        return $approvedCount + 1;
+    }
+
+    /**
+     * Check if timesheet can be edited by current user
+     */
+    private function canEditTimesheet(Timesheet $timesheet, Employee $employee): bool
+    {
+        // Owner can edit if in draft or reopened status
+        if ($timesheet->employee_id == $employee->id) {
+            return in_array($timesheet->overall_status, ['draft', 'reopened']);
+        }
+
+        // Managers can reopen approved/rejected timesheets
+        return $this->isManagerOrAdmin($employee);
     }
 }
